@@ -24,7 +24,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 
 // WebBrowser.maybeCompleteAuthSession(); // ❌ больше не нужно
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -87,7 +87,13 @@ export default function LoginScreen({ navigation }) {
       }
 
       await login(data.accessToken, data.user);
-      navigation.replace('MainTabs');
+      
+      // Проверяем, нужно ли перенаправить на бронирование
+      if (route.params?.returnTo === 'Booking' && route.params?.bookingData) {
+        navigation.navigate('Booking', route.params.bookingData);
+      } else {
+        navigation.replace('MainTabs');
+      }
     } catch (error) {
       Alert.alert('Ошибка', error.message || 'Не удалось войти');
       console.error('Login error:', error);
@@ -127,7 +133,13 @@ export default function LoginScreen({ navigation }) {
           }
 
           await login(data.accessToken, data.user);
-          navigation.replace('MainTabs');
+          
+          // Проверяем, нужно ли перенаправить на бронирование
+          if (route.params?.returnTo === 'Booking' && route.params?.bookingData) {
+            navigation.navigate('Booking', route.params.bookingData);
+          } else {
+            navigation.replace('MainTabs');
+          }
         } catch (error) {
           Alert.alert('Ошибка', error.message || 'Не удалось войти через Apple');
           console.error('Apple auth error:', error);

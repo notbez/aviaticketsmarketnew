@@ -34,6 +34,7 @@ import PaymentsScreen from '../screens/PaymentsScreen';
 import FlightDetailsScreen from '../screens/FlightDetailsScreen';
 import SeatSelectionScreen from '../screens/SeatSelectionScreen';
 import PassengerInfoScreen from '../screens/PassengerInfoScreen';
+import BookingScreen from '../screens/BookingScreen';
 
 const Stack = createStackNavigator();
 
@@ -46,7 +47,7 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator 
       screenOptions={{ headerShown: false }}
-      initialRouteName="Login"
+      initialRouteName="MainTabs"
     >
       {/* Экраны авторизации */}
       <Stack.Screen name="Login" component={LoginScreen} />
@@ -61,6 +62,7 @@ export default function RootNavigator() {
       <Stack.Screen name="FlightDetails" component={FlightDetailsScreen} />
       <Stack.Screen name="SeatSelection" component={SeatSelectionScreen} />
       <Stack.Screen name="PassengerInfo" component={PassengerInfoScreen} />
+      <Stack.Screen name="Booking" component={BookingScreen} />
       
       {/* Экраны профиля и настроек */}
       <Stack.Screen name="Account" component={AccountScreen} />

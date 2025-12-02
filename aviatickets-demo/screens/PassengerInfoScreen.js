@@ -69,13 +69,15 @@ export default function PassengerInfoScreen({ route, navigation }) {
   };
 
   const handleContinue = () => {
-    // Здесь будет отправка данных на сервер
-    navigation.navigate('Booking', {
-      flight,
-      selectedSeats,
-      cabinClass,
-      passengers,
-      contactInfo,
+    navigation.navigate('Login', {
+      returnTo: 'Booking',
+      bookingData: {
+        flight,
+        selectedSeats,
+        cabinClass,
+        passengers,
+        contactInfo,
+      }
     });
   };
 
