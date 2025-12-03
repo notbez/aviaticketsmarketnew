@@ -29,20 +29,32 @@ export class BookingController {
   @Post('create')
   @UseGuards(JwtAuthGuard)
   public async create(@Request() req, @Body() body: any) {
-    const res = await this.bookingService.create(req.user.sub, body);
-    if (res.booking) {
-      const bookingObj = res.booking.toObject();
+    try {
+      console.log('[Booking] Create request from user:', req.user.sub);
+      console.log('[Booking] Body:', JSON.stringify(body, null, 2));
+      
+      const res = await this.bookingService.create(req.user.sub, body);
+      
+      if (res.booking) {
+        const bookingObj = res.booking.toObject();
+        return {
+          ...bookingObj,
+          _id: bookingObj._id.toString(),
+          ok: true,
+        };
+      }
+      
       return {
-        ...bookingObj,
-        _id: bookingObj._id.toString(),
-        ok: !!res.success,
-        error: res.success === false ? ('error' in res ? res.error : null) : null,
+        ok: false,
+        error: 'error' in res ? res.error : 'Failed to create booking',
+      };
+    } catch (error) {
+      console.error('[Booking] Error:', error);
+      return {
+        ok: false,
+        error: error.message || 'Internal server error',
       };
     }
-    return {
-      ok: false,
-      error: 'error' in res ? res.error : 'Failed to create booking',
-    };
   }
 
   @Get()

@@ -60,12 +60,22 @@ export default function BookingScreen({ route, navigation }) {
       }
 
       const json = await res.json();
-      if (json._id || json.id) {
-        // Переходим на экран оплаты
-        navigation.navigate('Payment', {
-          bookingId: json._id || json.id,
-          amount: flight?.price || 0,
-        });
+      console.log('Booking response:', json);
+      
+      // Проверяем успешность создания бронирования
+      const bookingId = json._id || json.booking?.id || json.id;
+      
+      if (json.ok === true && bookingId) {
+        Alert.alert(
+          'Успешно!',
+          'Бронирование создано',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('MainTabs', { screen: 'Tickets' })
+            }
+          ]
+        );
       } else {
         Alert.alert(
           'Ошибка бронирования',

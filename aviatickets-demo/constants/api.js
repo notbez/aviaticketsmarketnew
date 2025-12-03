@@ -18,7 +18,7 @@ const getApiBase = () => {
     // expo-constants not available
   }
   
-  // Default fallback - используем ваш сервер
+  // Default fallback - сервер на Timeweb
   return 'http://193.233.103.8:3000';
 };
 
