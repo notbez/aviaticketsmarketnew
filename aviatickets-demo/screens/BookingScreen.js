@@ -123,7 +123,7 @@ export default function BookingScreen({ route, navigation }) {
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Итого:</Text>
             <Text style={styles.priceValue}>
-              {flight?.price || 0} ₽
+              {(flight?.price || 0).toLocaleString('ru-RU')} ₽
             </Text>
           </View>
         </View>

@@ -25,8 +25,10 @@ export default function HomeScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const [from, setFrom] = useState('Дубай, ОАЭ');
-  const [to, setTo] = useState('Выберите направление');
+  const [fromCode, setFromCode] = useState('SVO');
+  const [toCode, setToCode] = useState('');
+  const [fromName, setFromName] = useState('Москва (Шереметьево)');
+  const [toName, setToName] = useState('Выберите направление');
 
   const [date, setDate] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
@@ -57,37 +59,66 @@ export default function HomeScreen() {
   };
 
   const onSearch = () => {
+    if (!fromCode || !toCode) {
+      alert('Пожалуйста, выберите города отправления и назначения');
+      return;
+    }
+    
     setLoading(true);
 
     setTimeout(() => {
       try {
         const onelyaData = require('../code.json');
         const flights = [];
+        const seenFlights = new Set();
+        
+        const formatTime = (dt) => {
+          if (!dt) return '00:00';
+          const d = new Date(dt);
+          return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        };
+        
+        const formatDate = (dt) => {
+          if (!dt) return '';
+          const d = new Date(dt);
+          return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+        };
+        
+        const formatDuration = (dur) => {
+          if (!dur) return '0ч 0м';
+          const m = dur.match(/(\d+):(\d+)/);
+          return m ? `${m[1]}ч ${m[2]}м` : dur;
+        };
+        
+        const airlines = { 'S7': 'S7 Airlines', 'SU': 'Аэрофлот', 'UT': 'UTair' };
         
         onelyaData.Routes?.forEach((route, routeIndex) => {
           route.Segments?.forEach((segment, segmentIndex) => {
             const flight = segment.Flights?.[0];
             if (!flight) return;
             
-            const formatTime = (dt) => {
-              if (!dt) return '00:00';
-              const d = new Date(dt);
-              return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-            };
+            // Проверяем соответствие выбранным городам и дате
+            const flightDate = new Date(flight.DepartureDateTime);
+            const searchDate = new Date(date);
             
-            const formatDuration = (dur) => {
-              if (!dur) return '0ч 0м';
-              const m = dur.match(/(\d+):(\d+)/);
-              return m ? `${m[1]}ч ${m[2]}м` : dur;
-            };
+            if (flight.OriginAirportCode !== fromCode || 
+                flight.DestinationAirportCode !== toCode ||
+                flightDate.toDateString() !== searchDate.toDateString()) {
+              return;
+            }
             
-            const airlines = { 'S7': 'S7 Airlines', 'SU': 'Аэрофлот', 'UT': 'UTair' };
-            const price = route.Cost ? Math.round(route.Cost / route.Segments.length) : 25000;
+            // Уникальный ключ для предотвращения дубликатов
+            const flightKey = `${flight.MarketingAirlineCode}-${flight.FlightNumber}-${flight.DepartureDateTime}`;
+            if (seenFlights.has(flightKey)) return;
+            seenFlights.add(flightKey);
+            
+            const price = route.Cost || 25000;
             
             flights.push({
               id: `flight-${routeIndex}-${segmentIndex}`,
               from: flight.OriginAirportCode,
               to: flight.DestinationAirportCode,
+              date: formatDate(flight.DepartureDateTime),
               fromCountry: 'Россия',
               toCountry: 'Россия',
               departTime: formatTime(flight.DepartureDateTime),
@@ -97,7 +128,7 @@ export default function HomeScreen() {
               provider: airlines[flight.MarketingAirlineCode] || flight.MarketingAirlineCode,
               airplane: flight.Airplane || 'Boeing 737',
               class: flight.BrandedFareInfo?.BrandName || 'Эконом',
-              price: price.toLocaleString('ru-RU'),
+              price: Math.round(price),
               logo: `https://via.placeholder.com/42x42/2aa8ff/ffffff?text=${flight.MarketingAirlineCode}`,
               availableSeats: segment.AvailablePlaceQuantity || 9,
               hasStops: !!(flight.TechnicalLandings?.length),
@@ -110,12 +141,12 @@ export default function HomeScreen() {
           });
         });
         
-        console.log('Loaded flights:', flights.length);
-        
         setLoading(false);
         nav.navigate('Results', { 
-          from: 'MOW', 
-          to: 'TJM',
+          from: fromCode, 
+          to: toCode,
+          fromName,
+          toName,
           results: flights 
         });
       } catch (error) {
@@ -198,11 +229,14 @@ export default function HomeScreen() {
           <Field
             label="Откуда"
             icon="airplane-takeoff"
-            value={from}
+            value={fromName}
             onPress={() =>
               nav.navigate('SelectCity', {
                 target: 'from',
-                onSelect: (v) => setFrom(v),
+                onSelect: (code, name) => {
+                  setFromCode(code);
+                  setFromName(name);
+                },
               })
             }
           />
@@ -210,11 +244,14 @@ export default function HomeScreen() {
           <Field
             label="Куда"
             icon="airplane-landing"
-            value={to}
+            value={toName}
             onPress={() =>
               nav.navigate('SelectCity', {
                 target: 'to',
-                onSelect: (v) => setTo(v),
+                onSelect: (code, name) => {
+                  setToCode(code);
+                  setToName(name);
+                },
               })
             }
           />

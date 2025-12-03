@@ -259,7 +259,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
               <View>
                 <Text style={styles.continueButtonLabel}>Итого:</Text>
                 <Text style={styles.continueButtonAmount}>
-                  {(flight?.price || 950)}$
+                  {(flight?.price || 950).toLocaleString('ru-RU')} ₽
                 </Text>
               </View>
               <Text style={styles.continueButtonText}>Продолжить</Text>

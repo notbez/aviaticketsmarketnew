@@ -45,7 +45,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
             <MaterialIcons name="flight" size={24} color="#0277bd" />
             <Text style={styles.routeTo}>{flight?.to || 'SFO'}</Text>
           </View>
-          <Text style={styles.price}>{flight?.price || 850}$</Text>
+          <Text style={styles.price}>{(flight?.price || 850).toLocaleString('ru-RU')} ₽</Text>
         </View>
 
         {/* Tabs */}
@@ -97,7 +97,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
                   {flight?.from || 'ENG'} {flight?.departTime || '6:30 PM'}
                 </Text>
                 <Text style={styles.routeDate}>
-                  {formatDate(flight?.date) || '19 фев 2025'}
+                  {flight?.date || '19.02.2025'}
                 </Text>
               </View>
 
@@ -114,7 +114,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
                   {flight?.to || 'SFO'} {flight?.arriveTime || '8:30 PM'}
                 </Text>
                 <Text style={styles.routeDate}>
-                  {formatDate(flight?.date) || '19 фев 2025'}
+                  {flight?.date || '19.02.2025'}
                 </Text>
               </View>
             </View>
@@ -123,7 +123,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
               <Text style={styles.priceTitle}>Детализация цены</Text>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>1 Взрослый</Text>
-                <Text style={styles.priceValue}>{flight?.price || 850}$</Text>
+                <Text style={styles.priceValue}>{(flight?.price || 850).toLocaleString('ru-RU')} ₽</Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Налог</Text>
@@ -131,20 +131,20 @@ export default function FlightDetailsScreen({ route, navigation }) {
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Доп. багаж 3кг</Text>
-                <Text style={styles.priceValue}>150$</Text>
+                <Text style={styles.priceValue}>0 ₽</Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Приоритетная регистрация</Text>
-                <Text style={styles.priceValue}>0$</Text>
+                <Text style={styles.priceValue}>0 ₽</Text>
               </View>
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Скидка</Text>
-                <Text style={[styles.priceValue, styles.discount]}>-50$</Text>
+                <Text style={[styles.priceValue, styles.discount]}>0 ₽</Text>
               </View>
               <View style={[styles.priceRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Итого</Text>
                 <Text style={styles.totalValue}>
-                  {(flight?.price || 850) + 150 - 50}$
+                  {(flight?.price || 850).toLocaleString('ru-RU')} ₽
                 </Text>
               </View>
             </View>

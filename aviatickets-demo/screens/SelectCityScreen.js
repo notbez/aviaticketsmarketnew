@@ -1,9 +1,43 @@
 // screens/SelectCityScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import { AIRPORTS } from '../constants/airports';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Извлекаем города из code.json
+const getAirportsFromCodeJson = () => {
+  try {
+    const codeData = require('../code.json');
+    const airportCodes = new Set();
+    
+    codeData.Routes?.forEach(route => {
+      route.Segments?.forEach(segment => {
+        segment.Flights?.forEach(flight => {
+          if (flight.OriginAirportCode) airportCodes.add(flight.OriginAirportCode);
+          if (flight.DestinationAirportCode) airportCodes.add(flight.DestinationAirportCode);
+        });
+      });
+    });
+    
+    const cityNames = {
+      'SVO': 'Москва (Шереметьево)',
+      'DME': 'Москва (Домодедово)', 
+      'VKO': 'Москва (Внуково)',
+      'TJM': 'Тюмень',
+      'OVB': 'Новосибирск'
+    };
+    
+    return Array.from(airportCodes).map(code => ({
+      code,
+      city: cityNames[code] || code
+    }));
+  } catch (error) {
+    console.error('Error loading airports from code.json:', error);
+    return [];
+  }
+};
+
+const AIRPORTS_FROM_CODE = getAirportsFromCodeJson();
 
 export default function SelectCityScreen() {
   const insets = useSafeAreaInsets();
@@ -12,11 +46,11 @@ export default function SelectCityScreen() {
 
   const target = route.params?.target || 'from';
   const [query, setQuery] = useState('');
-  const [list, setList] = useState(AIRPORTS);
+  const [list, setList] = useState(AIRPORTS_FROM_CODE);
 
   useEffect(() => {
     setList(
-      AIRPORTS.filter(a => {
+      AIRPORTS_FROM_CODE.filter(a => {
         if (!query) return true;
         const q = query.toLowerCase();
         return (
@@ -27,8 +61,8 @@ export default function SelectCityScreen() {
     );
   }, [query]);
 
-  const pick = (code) => {
-    if (route.params?.onSelect) route.params.onSelect(code);
+  const pick = (airport) => {
+    if (route.params?.onSelect) route.params.onSelect(airport.code, airport.city);
     nav.goBack();
   };
 
@@ -49,7 +83,7 @@ export default function SelectCityScreen() {
         data={list}
         keyExtractor={(i) => i.code}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.item} onPress={() => pick(item.code)}>
+          <TouchableOpacity style={styles.item} onPress={() => pick(item)}>
             <Text style={styles.code}>{item.code}</Text>
             <Text style={styles.city}>{item.city}</Text>
           </TouchableOpacity>

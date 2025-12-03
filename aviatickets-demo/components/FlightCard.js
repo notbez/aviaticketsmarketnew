@@ -13,7 +13,7 @@ export default function FlightCard({ item, onBook }) {
             <Image source={{ uri: item.logo }} style={styles.logo} />
             <Text style={styles.airline}>{item.provider}</Text>
           </View>
-          <Text style={styles.price}>{item.price} ₽</Text>
+          <Text style={styles.price}>{typeof item.price === 'number' ? item.price.toLocaleString('ru-RU') : item.price} ₽</Text>
         </View>
 
         {/* Маршрут с самолетом и пунктиром */}
