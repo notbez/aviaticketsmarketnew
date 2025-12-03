@@ -17,6 +17,7 @@
 
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
+import { useAuth } from '../contexts/AuthContext';
 import BottomTabs from './BottomTabs';
 
 import SplashScreen from '../screens/SplashScreen';
@@ -45,10 +46,16 @@ const Stack = createStackNavigator();
  * @returns {JSX.Element} Stack Navigator с всеми экранами
  */
 export default function RootNavigator() {
+  const { token, loading } = useAuth();
+  
+  if (loading) {
+    return null;
+  }
+  
   return (
     <Stack.Navigator 
       screenOptions={{ headerShown: false }}
-      initialRouteName="MainTabs"
+      initialRouteName={token ? "MainTabs" : "Login"}
     >
       {/* Экраны авторизации */}
       <Stack.Screen name="Login" component={LoginScreen} />

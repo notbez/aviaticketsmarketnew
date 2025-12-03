@@ -1,5 +1,6 @@
 // screens/PassengerInfoScreen.js
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import {
   SafeAreaView,
   View,
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function PassengerInfoScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
+  const { token } = useAuth();
   const { flight, selectedSeats, cabinClass } = route.params || {};
   const [expandedPassenger, setExpandedPassenger] = useState(0);
   const [passengers, setPassengers] = useState([
@@ -69,16 +71,28 @@ export default function PassengerInfoScreen({ route, navigation }) {
   };
 
   const handleContinue = () => {
-    navigation.navigate('Login', {
-      returnTo: 'Booking',
-      bookingData: {
+    // Если пользователь уже авторизован, переходим сразу на бронирование
+    if (token) {
+      navigation.navigate('Booking', {
         flight,
         selectedSeats,
         cabinClass,
         passengers,
         contactInfo,
-      }
-    });
+      });
+    } else {
+      // Если не авторизован, переходим на экран входа
+      navigation.navigate('Login', {
+        returnTo: 'Booking',
+        bookingData: {
+          flight,
+          selectedSeats,
+          cabinClass,
+          passengers,
+          contactInfo,
+        }
+      });
+    }
   };
 
   return (
