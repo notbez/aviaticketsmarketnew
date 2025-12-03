@@ -49,11 +49,27 @@ export default function TicketsScreen({ navigation }) {
     }
   };
 
-  // Фильтрация билетов по статусу (пока что мок данные)
+  // Фильтрация билетов по статусу
   const getFilteredBookings = () => {
-    // Пока что возвращаем пустой массив, так как реальных данных от Onelya нет
-    // В будущем здесь будет фильтрация по bookingStatus
-    return [];
+    if (!bookings || bookings.length === 0) return [];
+    
+    const now = new Date();
+    
+    return bookings.filter((booking) => {
+      const departureDate = booking.departureDate ? new Date(booking.departureDate) : null;
+      
+      if (activeTab === 'upcoming') {
+        // Предстоящие рейсы
+        return departureDate && departureDate >= now;
+      } else if (activeTab === 'completed') {
+        // Завершенные рейсы
+        return departureDate && departureDate < now;
+      } else if (activeTab === 'cancelled') {
+        // Отмененные (пока нет такого статуса)
+        return booking.status === 'cancelled';
+      }
+      return false;
+    });
   };
 
   const formatDate = (dateString) => {
@@ -67,14 +83,14 @@ export default function TicketsScreen({ navigation }) {
   };
 
   const renderBookingCard = (booking) => {
-    const airlineName = booking.provider === 'onelya' ? 'Авиакомпания' : 'Демо-рейс';
+    const airlineName = booking.airline || 'Авиакомпания';
     const flightNumber = booking.flightNumber || 'N/A';
     const from = booking.from || 'N/A';
     const to = booking.to || 'N/A';
     const departTime = booking.departTime || 'N/A';
     const arriveTime = booking.arriveTime || 'N/A';
-    const duration = booking.duration || 'N/A';
-    const date = formatDate(booking.departureDate);
+    const duration = booking.duration || '2ч 30м';
+    const date = formatDate(booking.date || booking.departureDate);
 
     return (
       <View key={booking._id || booking.id} style={styles.bookingCard}>

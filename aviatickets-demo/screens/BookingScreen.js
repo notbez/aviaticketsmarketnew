@@ -56,12 +56,16 @@ export default function BookingScreen({ route, navigation }) {
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || 'Ошибка сервера');
+        throw new Error(error.message || error.error || 'Ошибка сервера');
       }
 
       const json = await res.json();
-      if (json.ok && json.booking) {
-        navigation.navigate('Ticket', { booking: json.booking });
+      if (json._id || json.id) {
+        // Переходим на экран оплаты
+        navigation.navigate('Payment', {
+          bookingId: json._id || json.id,
+          amount: flight?.price || 0,
+        });
       } else {
         Alert.alert(
           'Ошибка бронирования',

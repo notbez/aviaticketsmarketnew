@@ -30,11 +30,18 @@ export class BookingController {
   @UseGuards(JwtAuthGuard)
   public async create(@Request() req, @Body() body: any) {
     const res = await this.bookingService.create(req.user.sub, body);
+    if (res.booking) {
+      const bookingObj = res.booking.toObject();
+      return {
+        ...bookingObj,
+        _id: bookingObj._id.toString(),
+        ok: !!res.success,
+        error: res.success === false ? ('error' in res ? res.error : null) : null,
+      };
+    }
     return {
-      ok: !!res.success,
-      booking: res.booking || null,
-      raw: res.raw || null,
-      error: res.success === false ? (res.error || null) : null,
+      ok: false,
+      error: 'error' in res ? res.error : 'Failed to create booking',
     };
   }
 
@@ -42,7 +49,7 @@ export class BookingController {
   @UseGuards(JwtAuthGuard)
   public async getUserBookings(@Request() req) {
     const bookings = await this.bookingService.getUserBookings(req.user.sub);
-    return { bookings: bookings.map(b => b.toObject()) };
+    return bookings.map(b => b.toObject());
   }
 
   @Get(':id')

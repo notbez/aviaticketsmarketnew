@@ -15,7 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -37,17 +37,26 @@ export default function ProfileScreen({ navigation }) {
     { key: 'settings', title: 'Настройки', icon: <MaterialIcons name="settings" size={20} color="#0277bd" />, screen: 'Settings' },
   ];
 
-  // пример профиля — в реале берёте из стора / API
+  // Получаем данные пользователя из контекста
   const profile = {
-    name: 'Вахиб Кхан',
-    email: 'wahibkhan5959@gmail.com',
-    // avatar: 'https://example.com/path/to/avatar.jpg' // если есть - поставьте сюда
+    name: user?.fullName || 'Пользователь',
+    email: user?.email || '',
+    avatar: user?.avatarUrl || null,
   };
 
-  // remote fallback (никаких локальных require -> безопасно для сборки)
+  // Генерируем аватар с инициалами
+  const getInitials = (name) => {
+    if (!name) return 'П';
+    const parts = name.split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0][0]}+${parts[1][0]}`;
+    }
+    return parts[0][0];
+  };
+
   const avatarUri =
     profile.avatar ||
-    'https://ui-avatars.com/api/?name=В+К&background=E3F2FD&color=0277BD&rounded=true&size=256';
+    `https://ui-avatars.com/api/?name=${getInitials(profile.name)}&background=E3F2FD&color=0277BD&rounded=true&size=256`;
 
   return (
     <SafeAreaView style={styles.safe}>
