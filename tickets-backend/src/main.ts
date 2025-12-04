@@ -42,6 +42,9 @@ async function bootstrap() {
     .setVersion('0.1')
     .build();
 
+  // Устанавливаем глобальный префикс для всех роутов
+  app.setGlobalPrefix('api');
+
   // Создаем Swagger документ и настраиваем его на маршруте /api
   // После запуска документация будет доступна по адресу: http://localhost:3000/api
   const document = SwaggerModule.createDocument(app, config);

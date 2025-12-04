@@ -21,43 +21,37 @@ export const AuthProvider = ({ children }) => {
     restoreSession();
   }, []);
 
-  const restoreSession = async () => {
-    try {
-      const storedToken = await AsyncStorage.getItem('authToken');
-
-      if (!storedToken) {
-        setLoading(false);
-        return;
-      }
-
-      const res = await fetch(`${API_BASE}/me`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${storedToken}`,
-        },
-      });
-
-      if (!res.ok) {
-        // Токен просрочен или недействителен
-        await AsyncStorage.removeItem('authToken');
-        setToken(null);
-        setUser(null);
-      } else {
-        const userData = await res.json();
-        setToken(storedToken);
-        setUser(userData);
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-      }
-    } catch (err) {
-      console.error('Session restore error:', err);
-      await AsyncStorage.removeItem('authToken');
-      setUser(null);
-      setToken(null);
-    } finally {
+// внутри AuthContext.restoreSession
+const restoreSession = async () => {
+  try {
+    const storedToken = await AsyncStorage.getItem('authToken');
+    if (!storedToken) {
       setLoading(false);
+      return;
     }
-  };
+
+    // api() сам прочитает authToken из AsyncStorage и добавит Authorization
+    const userData = await api('/me');
+    if (!userData) {
+      // на всякий случай — если сервер вернул null
+      await AsyncStorage.removeItem('authToken');
+      setToken(null);
+      setUser(null);
+    } else {
+      setToken(storedToken);
+      setUser(userData);
+      await AsyncStorage.setItem('user', JSON.stringify(userData));
+    }
+  } catch (err) {
+    console.error('Session restore error:', err);
+    await AsyncStorage.removeItem('authToken');
+    await AsyncStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------------------------
   // Login
