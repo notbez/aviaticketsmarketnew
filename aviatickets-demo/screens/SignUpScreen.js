@@ -14,8 +14,8 @@ import Input from '../components/Input';
 import PrimaryButton from '../components/PrimaryButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -89,28 +89,11 @@ export default function SignUpScreen({ navigation }) {
         notificationsAccepted,
       };
 
-      const res = await fetch(`${API_BASE}/auth/register`, {
+      const data = await api('/auth/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        // Обработка различных типов ошибок
-        let errorMessage = 'Ошибка регистрации';
-        if (data.message) {
-          errorMessage = data.message;
-        } else if (data.error) {
-          errorMessage = typeof data.error === 'string' ? data.error : data.error.message || errorMessage;
-        } else if (Array.isArray(data.message)) {
-          errorMessage = data.message.join(', ');
-        }
-        throw new Error(errorMessage);
-      }
-
-      // Проверяем наличие необходимых полей в ответе
       if (!data.accessToken || !data.user) {
         throw new Error('Некорректный ответ от сервера');
       }

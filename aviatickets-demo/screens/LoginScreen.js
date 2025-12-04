@@ -14,8 +14,8 @@ import PrimaryButton from '../components/PrimaryButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 // ❌ Google auth отключено — удалено
 // import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -60,28 +60,11 @@ export default function LoginScreen({ route, navigation }) {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      const data = await api('/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
       });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        // Обработка различных типов ошибок
-        let errorMessage = 'Ошибка входа';
-        if (data.message) {
-          errorMessage = data.message;
-        } else if (data.error) {
-          errorMessage = typeof data.error === 'string' ? data.error : data.error.message || errorMessage;
-        } else if (res.status === 401) {
-          errorMessage = 'Неверный email или пароль';
-        }
-        throw new Error(errorMessage);
-      }
-
-      // Проверяем наличие необходимых полей в ответе
       if (!data.accessToken || !data.user) {
         throw new Error('Некорректный ответ от сервера');
       }
@@ -114,9 +97,8 @@ export default function LoginScreen({ route, navigation }) {
       if (credential.identityToken) {
         setLoading(true);
         try {
-          const res = await fetch(`${API_BASE}/auth/apple`, {
+          const data = await api('/auth/apple', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               identityToken: credential.identityToken,
               authorizationCode: credential.authorizationCode,
@@ -125,12 +107,6 @@ export default function LoginScreen({ route, navigation }) {
                 : undefined,
             }),
           });
-
-          const data = await res.json();
-
-          if (!res.ok) {
-            throw new Error(data.message || 'Ошибка авторизации через Apple');
-          }
 
           await login(data.accessToken, data.user);
           

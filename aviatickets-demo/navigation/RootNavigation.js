@@ -46,16 +46,10 @@ const Stack = createStackNavigator();
  * @returns {JSX.Element} Stack Navigator с всеми экранами
  */
 export default function RootNavigator() {
-  const { token, loading } = useAuth();
-  
-  if (loading) {
-    return null;
-  }
-  
   return (
     <Stack.Navigator 
       screenOptions={{ headerShown: false }}
-      initialRouteName={token ? "MainTabs" : "Login"}
+      initialRouteName="MainTabs"
     >
       {/* Экраны авторизации */}
       <Stack.Screen name="Login" component={LoginScreen} />

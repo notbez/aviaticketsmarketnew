@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, UseGuards, Request, Put } from '@nestjs/common';
+// src/auth/auth.controller.ts
+import { Controller, Post, Body, Get, UseGuards, Request, Put, NotFoundException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -34,9 +35,10 @@ export class AuthController {
   async getMe(@Request() req) {
     const user = await this.authService.validateUser(req.user.sub);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
     const userObj = user.toObject();
+    // passwordHash и avatar помечены select:false, но на всякий случай удалим
     delete userObj.passwordHash;
     delete userObj.avatar;
     return userObj;

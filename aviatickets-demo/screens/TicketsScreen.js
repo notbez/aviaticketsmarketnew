@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -32,16 +32,8 @@ export default function TicketsScreen({ navigation }) {
     
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/booking`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      if (res.ok) {
-        const data = await res.json();
-        setBookings(data || []);
-      }
+      const data = await api('/booking');
+      setBookings(data || []);
     } catch (error) {
       console.error('Error loading bookings:', error);
     } finally {

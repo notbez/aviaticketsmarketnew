@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
+import { api } from '../lib/api';
 
 const categories = [
   { id: 'all', name: 'Все', icon: 'format-list-bulleted' },
@@ -43,14 +43,7 @@ export default function FaqScreen({ navigation }) {
     try {
       setLoading(true);
       const categoryParam = selectedCategory !== 'all' ? `?category=${selectedCategory}` : '';
-      const res = await fetch(`${API_BASE}/faq${categoryParam}`);
-      
-      if (!res.ok) {
-        throw new Error('Failed to load FAQ');
-      }
-      
-      const data = await res.json();
-      // Убеждаемся, что data - это массив
+      const data = await api(`/faq${categoryParam}`);
       const faqsArray = Array.isArray(data) ? data : [];
       setFaqs(faqsArray);
     } catch (error) {

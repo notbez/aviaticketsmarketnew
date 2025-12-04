@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 export default function SupportScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -44,12 +44,7 @@ export default function SupportScreen({ navigation }) {
     if (!token) return;
 
     try {
-      const res = await fetch(`${API_BASE}/support/messages`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
+      const data = await api('/support/messages');
       setMessages(data || []);
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -66,20 +61,10 @@ export default function SupportScreen({ navigation }) {
     setSending(true);
 
     try {
-      const res = await fetch(`${API_BASE}/support/messages`, {
+      await api('/support/messages', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ message: messageText }),
       });
-
-      if (!res.ok) {
-        throw new Error('Ошибка отправки сообщения');
-      }
-
-      // Reload messages to get the response
       await loadMessages();
     } catch (error) {
       console.error('Error sending message:', error);

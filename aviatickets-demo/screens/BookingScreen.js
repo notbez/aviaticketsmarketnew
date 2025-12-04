@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 export default function BookingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -45,21 +45,10 @@ export default function BookingScreen({ route, navigation }) {
         cabinClass: cabinClass || 'Economy',
       };
 
-      const res = await fetch(`${API_BASE}/booking/create`, {
+      const json = await api('/booking/create', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(body),
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || 'Ошибка сервера');
-      }
-
-      const json = await res.json();
       console.log('Booking response:', json);
       
       // Проверяем успешность создания бронирования

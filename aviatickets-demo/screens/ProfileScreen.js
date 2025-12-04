@@ -15,16 +15,13 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
 
   const handleLogout = async () => {
     try {
       await logout();
-      // Навигация будет обработана автоматически через NavigationWrapper в App.js
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      // Перезагружаем экран профиля
+      navigation.replace('MainTabs', { screen: 'Profile' });
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -57,6 +54,39 @@ export default function ProfileScreen({ navigation }) {
   const avatarUri =
     profile.avatar ||
     `https://ui-avatars.com/api/?name=${getInitials(profile.name)}&background=E3F2FD&color=0277BD&rounded=true&size=256`;
+
+  // Если пользователь не авторизован
+  if (!token || !user) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <View style={{ width: 32 }} />
+          <Text style={styles.headerTitle}>Профиль</Text>
+          <View style={{ width: 32 }} />
+        </View>
+        
+        <View style={styles.notAuthContainer}>
+          <MaterialIcons name="person-outline" size={80} color="#ccc" />
+          <Text style={styles.notAuthTitle}>Вы не авторизованы</Text>
+          <Text style={styles.notAuthText}>Войдите в аккаунт для доступа к профилю</Text>
+          
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.loginButtonText}>Войти</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.registerButton}
+            onPress={() => navigation.navigate('SignUp')}
+          >
+            <Text style={styles.registerButtonText}>Зарегистрироваться</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -137,4 +167,53 @@ const styles = StyleSheet.create({
   menuIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#e3f2fd', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   menuTitle: { flex: 1, fontSize: 16, color: '#111' },
   logout: { backgroundColor: '#fff' },
+  notAuthContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 80,
+  },
+  notAuthTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111',
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  notAuthText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  loginButton: {
+    backgroundColor: '#0277bd',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  registerButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 48,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#0277bd',
+  },
+  registerButtonText: {
+    color: '#0277bd',
+    fontSize: 16,
+    fontWeight: '700',
+  },
 });

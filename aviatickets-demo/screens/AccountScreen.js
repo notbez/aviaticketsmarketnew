@@ -14,8 +14,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { API_BASE } from '../constants/api';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 export default function AccountScreen({ navigation }) {
   const { token, user, updateUser } = useAuth();
@@ -57,22 +57,7 @@ export default function AccountScreen({ navigation }) {
     
     try {
       setLoading(true);
-      const res = await fetch(`${API_BASE}/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          Alert.alert('Ошибка', 'Сессия истекла. Пожалуйста, войдите снова.');
-          setLoading(false);
-          return;
-        }
-        throw new Error(`Ошибка загрузки данных: ${res.status}`);
-      }
-      
-      const data = await res.json();
+      const data = await api('/me');
       
       if (!data || typeof data !== 'object') {
         throw new Error('Некорректные данные от сервера');
@@ -143,21 +128,10 @@ export default function AccountScreen({ navigation }) {
         },
       };
 
-      const res = await fetch(`${API_BASE}/me`, {
+      const updatedUser = await api('/me', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify(updateData),
       });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || 'Ошибка сохранения');
-      }
-
-      const updatedUser = await res.json();
       
       // Обновляем сохраненный профиль
       const updatedProfile = {

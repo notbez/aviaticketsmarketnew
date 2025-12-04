@@ -1,19 +1,4 @@
-/**
- * user.schema.ts - MongoDB схема для пользователей
- * 
- * Определяет структуру документа пользователя в базе данных:
- * - Основные данные: имя, email, телефон, пароль
- * - Паспортные данные: номер, страна, срок действия
- * - Настройки уведомлений: email, push
- * - Согласия: условия использования, уведомления
- * - OAuth данные: Google ID, Apple ID
- * - Аватар: URL и бинарные данные
- * 
- * timestamps: true автоматически добавляет поля createdAt и updatedAt
- * 
- * @module User
- */
-
+// src/schemas/user.schema.ts
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
 
@@ -24,13 +9,15 @@ export class User {
   @Prop({ required: true })
   fullName: string;
 
-  @Prop({ required: true, unique: true, lowercase: true })
+  // declare unique/index here — единственный источник правды
+  @Prop({ required: true, unique: true, lowercase: true, index: true })
   email: string;
 
   @Prop({ required: true })
   phone: string;
 
-  @Prop({ required: true })
+  // пароли храним как хэш
+  @Prop({ required: true, select: false })
   passwordHash: string;
 
   @Prop({
@@ -88,17 +75,17 @@ export class User {
   @Prop({ default: null })
   avatarUrl?: string;
 
-  @Prop({ type: Buffer, default: null })
+  @Prop({ type: Buffer, default: null, select: false })
   avatar?: Buffer;
 
   @Prop({ default: null })
   avatarMimeType?: string;
 
   // OAuth fields
-  @Prop({ default: null })
+  @Prop({ default: null, index: true })
   googleId?: string;
 
-  @Prop({ default: null })
+  @Prop({ default: null, index: true })
   appleId?: string;
 
   @Prop({ default: null })
@@ -113,8 +100,7 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// Indexes
-UserSchema.index({ email: 1 });
+// ОСТАВЛЯЕМ только индексы, которые _не_ дублируют email.
+// Убедитесь, что нигде в проекте нет второго UserSchema.index({ email: 1 }).
 UserSchema.index({ googleId: 1 });
 UserSchema.index({ appleId: 1 });
-
