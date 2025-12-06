@@ -1,10 +1,9 @@
 // src/auth/auth.controller.ts
-import { Controller, Post, Body, Get, UseGuards, Request, Put, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleOAuthDto, AppleOAuthDto } from './dto/oauth.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -28,19 +27,5 @@ export class AuthController {
   @Post('apple')
   async appleAuth(@Body() appleDto: AppleOAuthDto) {
     return this.authService.appleAuth(appleDto);
-  }
-
-  @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async getMe(@Request() req) {
-    const user = await this.authService.validateUser(req.user.sub);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-    const userObj = user.toObject();
-    // passwordHash и avatar помечены select:false, но на всякий случай удалим
-    delete userObj.passwordHash;
-    delete userObj.avatar;
-    return userObj;
   }
 }

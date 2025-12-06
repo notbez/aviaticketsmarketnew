@@ -2,6 +2,9 @@
 import { API_BASE } from '../constants/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * joinUrl - аккуратно соединяет base + endpoint
+ */
 function joinUrl(base, endpoint) {
   if (!endpoint) return base;
   if (endpoint.startsWith('/')) endpoint = endpoint.substring(1);
@@ -9,6 +12,12 @@ function joinUrl(base, endpoint) {
   return `${base}/${endpoint}`;
 }
 
+/**
+ * api - универсальная обёртка над fetch
+ * - добавляет Authorization если есть токен
+ * - парсит JSON/text
+ * - при 401 автоматически очищает authToken и кидает специальную ошибку 'Unauthorized'
+ */
 export async function api(endpoint, options = {}) {
   const token = await AsyncStorage.getItem('authToken');
 
@@ -27,12 +36,11 @@ export async function api(endpoint, options = {}) {
       headers,
     });
   } catch (e) {
-    // network error
     throw new Error(`Network error: ${e.message}`);
   }
 
-  let data = null;
   const text = await res.text().catch(() => null);
+  let data;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {
@@ -40,8 +48,22 @@ export async function api(endpoint, options = {}) {
   }
 
   if (!res.ok) {
-    // Пробуем понять сообщение ошибки
-    const msg = data?.message || data?.error || (typeof data === 'string' ? data : null) || `Request failed: ${res.status}`;
+    // Если Unauthorized — удаляем токен, чтобы приложение не застревало
+    if (res.status === 401) {
+      try {
+        await AsyncStorage.removeItem('authToken');
+        await AsyncStorage.removeItem('user');
+      } catch (e) {
+        // ignore
+      }
+      // Специальная ошибка, чтобы AuthContext мог распознать
+      const msg = data?.message || 'Unauthorized';
+      const err = new Error(msg);
+      err.name = 'Unauthorized';
+      throw err;
+    }
+
+    const msg = data?.message || data?.error || (typeof data === 'string' ? data : `Request failed: ${res.status}`);
     throw new Error(msg);
   }
 
