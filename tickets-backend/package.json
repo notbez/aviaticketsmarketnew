@@ -60,7 +60,7 @@
     "@types/bwip-js": "^3.2.3",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.2",
-    "@types/node": "^20.3.1",
+    "@types/node": "^20.19.25",
     "@types/node-fetch": "^2.6.11",
     "@types/pdfkit": "^0.13.9",
     "@types/stream-buffers": "^3.0.8",
