@@ -5,17 +5,3 @@ export class GoogleOAuthDto {
   @IsNotEmpty()
   idToken: string;
 }
-
-export class AppleOAuthDto {
-  @IsString()
-  @IsNotEmpty()
-  identityToken: string;
-
-  @IsString()
-  @IsNotEmpty()
-  authorizationCode: string;
-
-  @IsString()
-  fullName?: string;
-}
-

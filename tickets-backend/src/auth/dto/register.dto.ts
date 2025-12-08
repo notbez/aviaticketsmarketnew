@@ -1,4 +1,11 @@
-import { IsEmail, IsString, MinLength, IsNotEmpty, IsBoolean } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsNotEmpty,
+  IsBoolean,
+  IsOptional,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -18,13 +25,17 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 
+  @IsOptional()
   @IsString()
   passportNumber?: string;
 
+  @IsOptional()
   @IsString()
   passportCountry?: string;
 
-  passportExpiryDate?: Date;
+  @IsOptional()
+  @IsString()
+  passportExpiryDate?: string;
 
   @IsBoolean()
   termsAccepted: boolean;
@@ -32,4 +43,3 @@ export class RegisterDto {
   @IsBoolean()
   notificationsAccepted: boolean;
 }
-
