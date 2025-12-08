@@ -62,7 +62,6 @@ export default function RootNavigator() {
       <Stack.Screen name="Results" component={ResultsScreen} />
       <Stack.Screen name="SelectCity" component={SelectCityScreen} />
       <Stack.Screen name="FlightDetails" component={FlightDetailsScreen} />
-      <Stack.Screen name="SeatSelection" component={SeatSelectionScreen} />
       <Stack.Screen name="PassengerInfo" component={PassengerInfoScreen} />
       <Stack.Screen name="Booking" component={BookingScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />

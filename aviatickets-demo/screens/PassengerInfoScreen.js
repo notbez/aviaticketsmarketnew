@@ -18,8 +18,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function PassengerInfoScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { flight, selectedSeats, cabinClass } = route.params || {};
+  const { flight } = route.params || {};
   const [expandedPassenger, setExpandedPassenger] = useState(0);
+  const [showDOBPicker, setShowDOBPicker] = useState(null);
+  const [showExpiryPicker, setShowExpiryPicker] = useState(null);
+  const COUNTRIES = ['Россия', 'Узбекистан'];
+  const [countryDropdownIndex, setCountryDropdownIndex] = useState(null);
   const [passengers, setPassengers] = useState([
     {
       firstName: '',
@@ -75,8 +79,6 @@ export default function PassengerInfoScreen({ route, navigation }) {
     if (token) {
       navigation.navigate('Booking', {
         flight,
-        selectedSeats,
-        cabinClass,
         passengers,
         contactInfo,
       });
@@ -86,14 +88,15 @@ export default function PassengerInfoScreen({ route, navigation }) {
         returnTo: 'Booking',
         bookingData: {
           flight,
-          selectedSeats,
-          cabinClass,
           passengers,
           contactInfo,
         }
       });
     }
   };
+  const formatDate = (d) =>
+    d ? `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth()+1)
+      .toString().padStart(2,'0')}.${d.getFullYear()}` : '';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -157,15 +160,15 @@ export default function PassengerInfoScreen({ route, navigation }) {
                   />
 
                   <Text style={styles.label}>Дата рождения</Text>
-                  <TextInput
-                    value={passenger.dateOfBirth}
-                    onChangeText={(text) =>
-                      updatePassenger(index, 'dateOfBirth', text)
-                    }
-                    style={styles.input}
-                    placeholder="дд/мм/гггг"
-                    keyboardType="numeric"
-                  />
+                  <TouchableOpacity
+  style={styles.input}
+  onPress={() => setShowDOBPicker(index)}
+>
+  <Text style={styles.placeholderText}>
+    {passenger.dateOfBirth || 'Выберите дату'}
+  </Text>
+  <MaterialIcons name="date-range" size={20} color="#666" />
+</TouchableOpacity>
 
                   <Text style={styles.label}>Пол</Text>
                   <TouchableOpacity
@@ -188,23 +191,47 @@ export default function PassengerInfoScreen({ route, navigation }) {
                   />
 
                   <Text style={styles.label}>Страна выдачи</Text>
-                  <TouchableOpacity style={styles.input}>
-                    <Text style={styles.placeholderText}>
-                      Выберите страну
-                    </Text>
-                    <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
-                  </TouchableOpacity>
+                  <TouchableOpacity
+  style={styles.input}
+  onPress={() =>
+    setCountryDropdownIndex(
+      countryDropdownIndex === index ? null : index
+    )
+  }
+>
+  <Text style={styles.placeholderText}>
+    {passenger.countryOfIssue || 'Выберите страну'}
+  </Text>
+  <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
+</TouchableOpacity>
+
+{countryDropdownIndex === index && (
+  <View style={styles.dropdown}>
+    {['Россия', 'Узбекистан'].map((c) => (
+      <TouchableOpacity
+        key={c}
+        style={styles.dropdownItem}
+        onPress={() => {
+          updatePassenger(index, 'countryOfIssue', c);
+          setCountryDropdownIndex(null);
+        }}
+      >
+        <Text style={styles.dropdownText}>{c}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
 
                   <Text style={styles.label}>Срок действия паспорта</Text>
-                  <TextInput
-                    value={passenger.passportExpiryDate}
-                    onChangeText={(text) =>
-                      updatePassenger(index, 'passportExpiryDate', text)
-                    }
-                    style={styles.input}
-                    placeholder="дд/мм/гггг"
-                    keyboardType="numeric"
-                  />
+                  <TouchableOpacity
+  style={styles.input}
+  onPress={() => setShowExpiryPicker(index)}
+>
+  <Text style={styles.placeholderText}>
+    {passenger.passportExpiryDate || 'Выберите дату'}
+  </Text>
+  <MaterialIcons name="date-range" size={20} color="#666" />
+</TouchableOpacity>
                 </View>
               )}
             </View>
@@ -280,6 +307,39 @@ export default function PassengerInfoScreen({ route, navigation }) {
             </View>
           </TouchableOpacity>
         </ScrollView>
+        {showDOBPicker !== null && (
+  <DateTimePicker
+    value={new Date()}
+    mode="date"
+    display="default"
+    onChange={(e, selected) => {
+      setShowDOBPicker(null);
+      if (selected)
+        updatePassenger(
+          showDOBPicker,
+          'dateOfBirth',
+          formatDate(selected)
+        );
+    }}
+  />
+)}
+
+{showExpiryPicker !== null && (
+  <DateTimePicker
+    value={new Date()}
+    mode="date"
+    display="default"
+    onChange={(e, selected) => {
+      setShowExpiryPicker(null);
+      if (selected)
+        updatePassenger(
+          showExpiryPicker,
+          'passportExpiryDate',
+          formatDate(selected)
+        );
+    }}
+  />
+)}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -427,6 +487,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
+  },
+  dropdown: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    padding: 14,
+  },
+  dropdownText: {
+    fontSize: 15,
+    color: '#333',
   },
 });
 

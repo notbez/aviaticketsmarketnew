@@ -79,12 +79,16 @@ export default function SignUpScreen({ navigation }) {
     try {
       const body = {
         fullName,
-        email,
+        email: email.trim().toLowerCase(),
         phone,
         password,
-        passportNumber: passportNumber || undefined,
-        passportCountry: passportCountry || undefined,
-        passportExpiryDate: passportExpiryDate || undefined,
+      
+        // паспортные данные — отправляем ТОЛЬКО если есть
+        ...(passportNumber ? { passportNumber } : {}),
+        ...(passportCountry ? { passportCountry } : {}),
+      
+        // ❌ passportExpiryDate НЕ ОТПРАВЛЯЕМ — бэкенд его не принимает
+      
         termsAccepted,
         notificationsAccepted,
       };

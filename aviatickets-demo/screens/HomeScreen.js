@@ -20,6 +20,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import { API_BASE } from '../constants/api';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ImageBackground } from 'react-native';
 
 export default function HomeScreen() {
   const nav = useNavigation();
@@ -174,6 +175,11 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+  <ImageBackground
+    source={require('../assets/home-wave.png')}
+    style={styles.bg}
+    resizeMode="cover"
+  >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
@@ -345,7 +351,9 @@ export default function HomeScreen() {
             <Text style={styles.searchTxt}>Поиск рейса</Text>
           </TouchableOpacity>
         </View>
+        
       </ScrollView>
+      </ImageBackground>
 
       {/* DATE PICKER */}
       {showPicker && (
@@ -481,5 +489,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  bg: {
+    width: '100%',
+    height: 260,     // высота волны
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
 });
