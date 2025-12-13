@@ -153,16 +153,6 @@ export class OnelyaService {
       body,
     );
   
-    if (Array.isArray(response?.Routes)) {
-      response.Routes.forEach(route => {
-        flightOfferStore.save(
-          route,
-          route.CheapestPrice ?? route.Price?.Total,
-          route.Currency || 'RUB'
-        );
-      });
-    }
-  
     return response;
   }
 

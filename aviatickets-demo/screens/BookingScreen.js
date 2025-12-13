@@ -36,14 +36,6 @@ export default function BookingScreen({ route, navigation }) {
     try {
       setLoading(true);
   
-      const {
-        offerId,
-        selectedBrandId,
-        passengers,
-        contactInfo,
-        flight,
-      } = route.params || {};
-  
       const json = await api('/booking/create', {
         method: 'POST',
         body: JSON.stringify({

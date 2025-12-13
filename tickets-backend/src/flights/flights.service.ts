@@ -8,6 +8,7 @@ import {
   BrandFarePricingRequest,
   BrandFarePricingResponse,
 } from '../onelya/dto/avia-search.dto';
+import { flightOfferStore } from './flight-offer.store';
 
 @Injectable()
 export class FlightsService {
@@ -164,7 +165,13 @@ export class FlightsService {
     }
 
     enrichedRoutes.forEach(route => {
-      flightOfferStore.save(route);
+      const offerId = flightOfferStore.save(
+        route,
+        route.Price?.Total || route.Amount || 0,
+        route.Price?.Currency || 'RUB',
+      );
+      
+      route.__offerId = offerId;
     });
     // Теперь формируем карточки для фронта
     const cards = enrichedRoutes.map((route: any, idx: number) => this.routeToCard(route, idx));
@@ -282,8 +289,9 @@ export class FlightsService {
       (fares.length > 0 ? fares[0].amount : null);
 
     return {
-      id: route.Id, // или сгенерированный
-      offerId: route.Id,
+      id: route.__offerId,
+providerRouteId: route.Id,
+offerId: route.__offerId,
       price: price ? Number(price) : null,
       currency: route?.Currency || 'RUB',
       fares,

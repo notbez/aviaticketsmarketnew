@@ -9,7 +9,6 @@ import {
   Alert,
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { api } from '../lib/api';
 import * as Linking from 'expo-linking';
 
 export default function TicketDetailsScreen() {
@@ -18,15 +17,8 @@ export default function TicketDetailsScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleBlank = () => {
-    const url = `${process.env.EXPO_PUBLIC_API_URL}/onelya/order/reservation/blank`;
-  
-    Linking.openURL(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        OrderId: order.OrderId,
-      }),
-    });
+    const url = `${process.env.EXPO_PUBLIC_API_URL}/booking/${order._id}/pdf`;
+    Linking.openURL(url);
   };
 
   const routeInfo = order.Routes?.[0];

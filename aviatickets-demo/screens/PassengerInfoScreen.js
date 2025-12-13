@@ -19,7 +19,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 export default function PassengerInfoScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { flight, selectedFare } = route.params || {};
+  const { flight, offerId, selectedBrandId, selectedFare } = route.params || {};
   const [expandedPassenger, setExpandedPassenger] = useState(0);
   const [showDOBPicker, setShowDOBPicker] = useState(null);
   const [showExpiryPicker, setShowExpiryPicker] = useState(null);
@@ -83,8 +83,11 @@ export default function PassengerInfoScreen({ route, navigation }) {
     // Если пользователь уже авторизован, переходим сразу на бронирование
     if (token) {
       navigation.navigate('Booking', {
-        flight,
-        selectedFare,
+        flight: {
+          ...flight,
+          offerId,
+          selectedBrandId,
+        },
         passengers,
         contactInfo,
       });
