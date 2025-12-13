@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 
@@ -225,20 +225,16 @@ export default function SignUpScreen({ navigation }) {
             </Text>
           </TouchableOpacity>
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={passportExpiryDate}
-              mode="date"
-              display="default"
-              minimumDate={new Date()}
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(Platform.OS === 'ios');
-                if (selectedDate) {
-                  setPassportExpiryDate(selectedDate);
-                }
-              }}
-            />
-          )}
+          <DateTimePickerModal
+  isVisible={showDatePicker}
+  mode="date"
+  minimumDate={new Date()}
+  onConfirm={(date) => {
+    setPassportExpiryDate(date);
+    setShowDatePicker(false);
+  }}
+  onCancel={() => setShowDatePicker(false)}
+/>
 
           <View style={styles.checkboxContainer}>
             <TouchableOpacity

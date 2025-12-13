@@ -1,29 +1,79 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const { token } = useAuth();
+
+  const { orderId, amount, currency = '₽' } = route.params || {};
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
-    setLoading(true);
-    
-    // Имитация обработки платежа
-    setTimeout(() => {
-      setLoading(false);
+    if (!token) {
+      Alert.alert('Ошибка', 'Необходима авторизация');
+      return;
+    }
+
+    if (!orderId) {
+      Alert.alert('Ошибка', 'Отсутствует идентификатор бронирования');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 🔹 Эмуляция успешной внешней оплаты
+      // Здесь позже можно подключить реальную платёжку
+
+      const json = await api('/onelya/order/reservation/confirm', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId,
+          paymentMethod: 'Cashless',
+        }),
+      });
+
+      console.log('Reservation/Confirm response:', json);
+
+      if (!json?.OrderId) {
+        Alert.alert('Ошибка оплаты', 'Бронирование не подтверждено');
+        return;
+      }
+
       Alert.alert(
         'Успешно!',
-        'Оплата прошла успешно. Билет отправлен на вашу почту.',
+        'Оплата прошла успешно. Билет оформлен.',
         [
           {
-            text: 'OK',
-            onPress: () => navigation.navigate('MainTabs', { screen: 'Tickets' })
-          }
+            text: 'Перейти к билетам',
+            onPress: () =>
+              navigation.reset({
+                index: 0,
+                routes: [
+                  { name: 'MainTabs', params: { screen: 'Tickets' } },
+                ],
+              }),
+          },
         ]
       );
-    }, 2000);
+    } catch (err) {
+      console.error('Payment error:', err);
+      Alert.alert('Ошибка', err.message || 'Ошибка при оплате');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -38,7 +88,9 @@ export default function PaymentScreen() {
       <ScrollView style={styles.content}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Сумма к оплате</Text>
-          <Text style={styles.amount}>{route.params?.amount || '0'} ₽</Text>
+          <Text style={styles.amount}>
+            {(amount || 0).toLocaleString('ru-RU')} {currency}
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -48,14 +100,16 @@ export default function PaymentScreen() {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.payButton, loading && styles.payButtonDisabled]}
           onPress={handlePayment}
           disabled={loading}
         >
-          <Text style={styles.payButtonText}>
-            {loading ? 'Обработка...' : 'Оплатить'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.payButtonText}>Оплатить</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </View>

@@ -1,22 +1,13 @@
 /**
  * App.js - Корневой компонент React Native приложения
- * 
- * Этот файл является точкой входа приложения и выполняет:
- * 1. Загрузку шрифтов Roboto
- * 2. Инициализацию AuthProvider для управления состоянием авторизации
- * 3. Настройку навигации через NavigationContainer
- * 4. Отображение экрана загрузки пока шрифты не загружены
- * 
- * @component App
+ * Работает с Expo SDK 46+ без expo-app-loading
  */
 
-import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, StatusBar } from 'react-native';
-import RootNavigator from './navigation/RootNavigation';
+import React, { useEffect, useState } from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import SplashScreen from './screens/SplashScreen';
-
+import RootNavigator from './navigation/RootNavigation';
+import { AuthProvider } from './contexts/AuthContext';
 import {
   useFonts,
   Roboto_400Regular,
@@ -36,9 +27,18 @@ function NavigationWrapper() {
 }
 
 /**
+ * Сплэш-экран с индикатором загрузки
+ */
+function LoadingScreen() {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" />
+    </View>
+  );
+}
+
+/**
  * Главный компонент приложения
- * 
- * @returns {JSX.Element} Корневой компонент с навигацией и провайдерами
  */
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -46,26 +46,32 @@ export default function App() {
     Roboto_500Medium,
     Roboto_700Bold,
   });
+
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     if (fontsLoaded) {
-      const timer = setTimeout(() => {
-        setShowSplash(false);
-      }, 2000);
+      const timer = setTimeout(() => setShowSplash(false), 2000); // Показываем сплэш 2 сек
       return () => clearTimeout(timer);
     }
   }, [fontsLoaded]);
 
+  // Пока шрифты не загружены или активен SplashScreen
   if (!fontsLoaded || showSplash) {
-    return <SplashScreen />;
+    return <LoadingScreen />;
   }
 
-  // Когда шрифты загружены, рендерим основное приложение
-  // AuthProvider оборачивает все приложение для доступа к состоянию авторизации
   return (
     <AuthProvider>
       <NavigationWrapper />
     </AuthProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

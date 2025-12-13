@@ -17,105 +17,75 @@ import { api } from '../lib/api';
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const [activeTab, setActiveTab] = useState('upcoming'); // upcoming, completed, cancelled
-  const [bookings, setBookings] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (token) {
-      loadBookings();
-    }
-  }, [token, activeTab]);
+    if (token) loadOrders();
+  }, [token]);
 
-  const loadBookings = async () => {
-    if (!token) return;
-    
+  const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await api('/booking');
-      setBookings(data || []);
-    } catch (error) {
-      console.error('Error loading bookings:', error);
+      const data = await api('/onelya/order/info/order-list', {
+        method: 'POST',
+        body: JSON.stringify({ Date: new Date().toISOString().slice(0, 10) })
+        });
+      setOrders(data?.Orders || []);
+    } catch (e) {
+      console.error('OrderList error', e);
     } finally {
       setLoading(false);
     }
   };
 
-  // Фильтрация билетов по статусу
-  const getFilteredBookings = () => {
-    if (!bookings || bookings.length === 0) return [];
-    
-    const now = new Date();
-    
-    return bookings.filter((booking) => {
-      const departureDate = booking.departureDate ? new Date(booking.departureDate) : null;
-      
-      if (activeTab === 'upcoming') {
-        // Предстоящие рейсы
-        return departureDate && departureDate >= now;
-      } else if (activeTab === 'completed') {
-        // Завершенные рейсы
-        return departureDate && departureDate < now;
-      } else if (activeTab === 'cancelled') {
-        // Отмененные (пока нет такого статуса)
-        return booking.status === 'cancelled';
-      }
-      return false;
-    });
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return '';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ru-RU', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const renderBookingCard = (booking) => {
-    const airlineName = booking.airline || 'Авиакомпания';
-    const flightNumber = booking.flightNumber || 'N/A';
-    const from = booking.from || 'N/A';
-    const to = booking.to || 'N/A';
-    const departTime = booking.departTime || 'N/A';
-    const arriveTime = booking.arriveTime || 'N/A';
-    const duration = booking.duration || '2ч 30м';
-    const date = formatDate(booking.date || booking.departureDate);
+  const renderOrder = (order) => {
+    const route = order.Routes?.[0];
+    const segment = route?.Segments?.[0];
 
     return (
-      <View key={booking._id || booking.id} style={styles.bookingCard}>
+      <View key={order.OrderId} style={styles.bookingCard}>
         <View style={styles.cardHeader}>
           <View style={styles.airlineLogo}>
             <Text style={styles.airlineLogoText}>
-              {airlineName.charAt(0).toUpperCase()}
+              {segment?.MarketingAirline?.Code || '✈️'}
             </Text>
           </View>
-          <View style={styles.cardHeaderContent}>
-            <Text style={styles.airlineName}>{airlineName}</Text>
-            <Text style={styles.flightNumber}>{flightNumber}</Text>
+          <View>
+            <Text style={styles.airlineName}>
+              {segment?.MarketingAirline?.Name || 'Авиакомпания'}
+            </Text>
+            <Text style={styles.flightNumber}>
+              Order #{order.OrderId}
+            </Text>
           </View>
         </View>
 
         <View style={styles.routeInfo}>
           <View style={styles.timeBlock}>
-            <Text style={styles.time}>{departTime}</Text>
-            <Text style={styles.cityCode}>{from}</Text>
+            <Text style={styles.time}>{segment?.Departure?.Time}</Text>
+            <Text style={styles.cityCode}>{segment?.Departure?.Airport}</Text>
           </View>
 
           <View style={styles.durationBlock}>
             <MaterialIcons name="flight" size={16} color="#666" />
-            <Text style={styles.durationText}>{duration}</Text>
+            <Text style={styles.durationText}>
+              {order.Status}
+            </Text>
           </View>
 
           <View style={styles.timeBlock}>
-            <Text style={styles.time}>{arriveTime}</Text>
-            <Text style={styles.cityCode}>{to}</Text>
+            <Text style={styles.time}>{segment?.Arrival?.Time}</Text>
+            <Text style={styles.cityCode}>{segment?.Arrival?.Airport}</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.detailsButton}>
+        <TouchableOpacity
+          style={styles.detailsButton}
+          onPress={() =>
+            navigation.navigate('TicketDetails', { order })
+          }
+        >
           <Text style={styles.detailsButtonText}>Подробности</Text>
         </TouchableOpacity>
       </View>
@@ -128,74 +98,16 @@ export default function TicketsScreen({ navigation }) {
         <Text style={styles.headerTitle}>Мои билеты</Text>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'upcoming' && styles.tabActive]}
-          onPress={() => setActiveTab('upcoming')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'upcoming' && styles.tabTextActive,
-            ]}
-          >
-            Ожидаемые
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'completed' && styles.tabActive]}
-          onPress={() => setActiveTab('completed')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'completed' && styles.tabTextActive,
-            ]}
-          >
-            Завершенные
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'cancelled' && styles.tabActive]}
-          onPress={() => setActiveTab('cancelled')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'cancelled' && styles.tabTextActive,
-            ]}
-          >
-            Отмененные
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-      >
+      <ScrollView contentContainerStyle={styles.contentContainer}>
         {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color="#0277bd" />
-          </View>
-        ) : getFilteredBookings().length === 0 ? (
+          <ActivityIndicator size="large" color="#0277bd" />
+        ) : orders.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialIcons name="flight" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>
-              {activeTab === 'upcoming' && 'Нет ожидаемых рейсов'}
-              {activeTab === 'completed' && 'Нет завершенных рейсов'}
-              {activeTab === 'cancelled' && 'Нет отмененных рейсов'}
-            </Text>
-            <Text style={styles.emptySubtext}>
-              Ваши билеты появятся здесь после бронирования
-            </Text>
+            <Text style={styles.emptyText}>Билетов пока нет</Text>
           </View>
         ) : (
-          getFilteredBookings().map((booking) => renderBookingCard(booking))
+          orders.map(renderOrder)
         )}
       </ScrollView>
     </SafeAreaView>

@@ -34,6 +34,81 @@ import {
   OrderListRequest,
   OrderListResponse,
 } from './dto/order-reservation.dto';
+import { flightOfferStore } from '../flights/flight-offer.store';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const CyrillicToTranslit = require('cyrillic-to-translit-js');
+
+const transliterator = new CyrillicToTranslit();
+
+function toIsoDate(date?: string): string | undefined {
+  if (!date) return undefined;
+
+  if (date.includes('-')) return date;
+
+  const parts = date.split('.');
+  if (parts.length !== 3) return undefined;
+
+  const [d, m, y] = parts;
+  return `${y}-${m}-${d}`;
+}
+
+function transliterate(value?: string): string | undefined {
+  if (!value) return undefined;
+  return transliterator.transform(value).toUpperCase();
+}
+
+function mapPassengerToOnelyaCustomer(p: any) {
+  const citizenship = p.citizenship || 'RU';
+
+  return {
+    CustomerType: p.customerType || 'Adult',
+
+    LastName: transliterate(p.lastName),
+    FirstName: transliterate(p.firstName),
+    MiddleName: p.middleName ? transliterate(p.middleName) : undefined,
+
+    Gender: p.gender === 'M' ? 'Male' : 'Female',
+
+    BirthDate: toIsoDate(p.dateOfBirth),
+
+    Citizenship: citizenship,
+
+    Document: {
+      DocumentType:
+        citizenship === 'RU' ? 'RussianPassport' : 'ForeignPassport',
+
+      Number: String(p.passportNumber).replace(/\D/g, ''),
+
+      CountryOfIssue: p.countryOfIssue || citizenship,
+
+      ExpireDate: toIsoDate(p.passportExpiryDate),
+    },
+  };
+}
+
+
+function assertValidProviderRaw(providerRaw: any) {
+  if (!providerRaw) {
+    throw new HttpException('ProviderRaw is required', 400);
+  }
+
+  if (providerRaw.Id === 'Obsolete') {
+    throw new HttpException(
+      'ProviderRaw is obsolete. Pricing is required before reservation',
+      400,
+    );
+  }
+
+  if (
+    Array.isArray(providerRaw.BrandFares) &&
+    providerRaw.BrandFares.length !== 1
+  ) {
+    throw new HttpException(
+      `Exactly one BrandFare must be selected, got ${providerRaw.BrandFares.length}`,
+      400,
+    );
+  }
+}
 
 @Injectable()
 export class OnelyaService {
@@ -43,6 +118,7 @@ export class OnelyaService {
   private readonly password: string;
   private readonly pos: string;
   private readonly timeoutMs: number;
+  
 
   constructor(
     private readonly httpService: HttpService,
@@ -71,13 +147,23 @@ export class OnelyaService {
     );
   }
 
-  async routePricing(
-    body: RoutePricingRequest,
-  ): Promise<RoutePricingResponse> {
-    return this.post<RoutePricingRequest, RoutePricingResponse>(
+  async routePricing(body: RoutePricingRequest): Promise<RoutePricingResponse> {
+    const response = await this.post<RoutePricingRequest, RoutePricingResponse>(
       '/Avia/V1/Search/RoutePricing',
       body,
     );
+  
+    if (Array.isArray(response?.Routes)) {
+      response.Routes.forEach(route => {
+        flightOfferStore.save(
+          route,
+          route.CheapestPrice ?? route.Price?.Total,
+          route.Currency || 'RUB'
+        );
+      });
+    }
+  
+    return response;
   }
 
   async datePricing(
@@ -107,14 +193,36 @@ export class OnelyaService {
     );
   }
 
-  async createReservation(
-    body: ReservationCreateRequest,
-  ): Promise<ReservationCreateResponse> {
-    return this.post<ReservationCreateRequest, ReservationCreateResponse>(
+  
+
+  async createReservation(body: any) {
+    const providerRaw = body.route || body.providerRaw;
+    const customers = (body.passengers || []).map(mapPassengerToOnelyaCustomer);
+  
+    assertValidProviderRaw(providerRaw);
+
+    this.logger.log(
+      `[Onelya] Reservation/Create Id=${providerRaw.Id}, BrandFares=${providerRaw.BrandFares?.length}`,
+    );
+  
+    return this.post(
       '/Order/V1/Reservation/Create',
-      body,
+      {
+        Customers: customers,
+        ReservationItems: [
+          {
+            Provider: 'Onelya',
+            ProviderRaw: providerRaw,
+          },
+        ],
+        ContactPhone: body.contact?.phone || '+79990000000',
+        ContactEmails: body.contact?.email
+          ? [body.contact.email]
+          : ['test@test.ru'],
+      },
     );
   }
+  
 
   async recalcReservation(
     body: ReservationRecalcRequest,

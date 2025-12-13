@@ -35,7 +35,7 @@ export class OnelyaController {
   @Post('avia/search/route-pricing')
   routePricing(
     @Body() body: RoutePricingRequest,
-  ): Promise<RoutePricingResponse> {
+  ): Promise<any> {
     return this.onelyaService.routePricing(body);
   }
 
@@ -61,7 +61,7 @@ export class OnelyaController {
   @Post('order/reservation/create')
   createReservation(
     @Body() body: ReservationCreateRequest,
-  ): Promise<ReservationCreateResponse> {
+  ): Promise<any> {
     return this.onelyaService.createReservation(body);
   }
 
@@ -75,7 +75,7 @@ export class OnelyaController {
   @Post('order/reservation/confirm')
   confirmReservation(
     @Body() body: ReservationConfirmRequest,
-  ): Promise<ReservationConfirmResponse> {
+  ): Promise<any> {
     return this.onelyaService.confirmReservation(body);
   }
 

@@ -82,5 +82,28 @@ export class UsersService {
   async getUserById(userId: string): Promise<UserDocument | null> {
     return this.userModel.findById(userId);
   }
+
+  async findByEmail(email: string): Promise<UserDocument | null> {
+    return this.userModel.findOne({ email }).exec();
+  }
+
+  async createOAuthUser(data: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    avatar?: string;
+    provider: string;
+  }) {
+    const user = new this.userModel({
+      email: data.email,
+      fullName: `${data.firstName || ''} ${data.lastName || ''}`.trim(),
+      phone: '',
+      passwordHash: null,
+      oauthProvider: data.provider,
+      avatarUrl: data.avatar || null,
+    });
+  
+    return user.save();
+  }
 }
 

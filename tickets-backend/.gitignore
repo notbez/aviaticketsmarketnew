@@ -1,7 +1,9 @@
 # compiled output
 /dist
 /node_modules
+/node_modules 2
 /build
+/expo
 
 # Logs
 logs

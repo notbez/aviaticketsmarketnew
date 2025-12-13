@@ -137,6 +137,15 @@ export class AuthService {
     };
   }
 
+  /**
+ * Генерация JWT для произвольного пользователя
+ * @param user - объект пользователя (достаточно иметь _id и email)
+ */
+generateJwt(user: any): string {
+  const payload = { sub: user._id.toString(), email: user.email };
+  return this.jwtService.sign(payload);
+}
+
   async googleAuth(googleDto: GoogleOAuthDto) {
     if (!this.googleClient) {
       throw new BadRequestException('Google OAuth not configured');

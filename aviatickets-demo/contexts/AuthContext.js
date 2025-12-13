@@ -1,52 +1,68 @@
 // contexts/AuthContext.js
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { api } from '../lib/api';
 
 const AuthContext = createContext();
-
 export const useAuth = () => useContext(AuthContext);
+
+const TOKEN_KEY = 'authToken';
+const USER_KEY = 'user';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setTokenState] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // helper: set token both in state and storage
   const setToken = useCallback(async (t) => {
     setTokenState(t);
     if (t) {
-      await AsyncStorage.setItem('authToken', t);
+      try {
+        await SecureStore.setItemAsync(TOKEN_KEY, t);
+      } catch (e) {
+        // fallback
+        await AsyncStorage.setItem(TOKEN_KEY, t);
+      }
     } else {
-      await AsyncStorage.removeItem('authToken');
+      try { await SecureStore.deleteItemAsync(TOKEN_KEY); } catch {}
+      await AsyncStorage.removeItem(TOKEN_KEY);
     }
   }, []);
 
-  // restore session on start
   useEffect(() => {
     (async () => {
       try {
-        const storedToken = await AsyncStorage.getItem('authToken');
-        const storedUser = await AsyncStorage.getItem('user');
+        // try secure store first
+        let storedToken = null;
+        try {
+          storedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+        } catch (e) {
+          storedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        }
+
+        const storedUserJson = await AsyncStorage.getItem(USER_KEY);
+        const storedUser = storedUserJson ? JSON.parse(storedUserJson) : null;
 
         if (!storedToken) {
           setLoading(false);
           return;
         }
 
-        // try fetch /me to validate token
+        // set temp state token to allow api() to include Authorization
+        setTokenState(storedToken);
+
+        // verify token by calling /me
         try {
           const me = await api('/me');
           setUser(me);
-          setTokenState(storedToken);
-          await AsyncStorage.setItem('user', JSON.stringify(me));
+          await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+          await setToken(storedToken); // ensure secure store
         } catch (err) {
-          // если получаем Unauthorized - очищаем
-          console.warn('restoreSession: token invalid, clearing storage', err);
-          await AsyncStorage.removeItem('authToken');
-          await AsyncStorage.removeItem('user');
+          console.warn('restoreSession: token invalid, clearing', err);
+          await setToken(null);
+          await AsyncStorage.removeItem(USER_KEY);
           setUser(null);
-          setTokenState(null);
         }
       } catch (err) {
         console.error('restoreSession error', err);
@@ -56,14 +72,14 @@ export const AuthProvider = ({ children }) => {
     })();
   }, [setToken]);
 
-  // login: получает accessToken и user (backend)
   const login = async (accessToken, userData) => {
     await setToken(accessToken);
     setUser(userData);
-    await AsyncStorage.setItem('user', JSON.stringify(userData));
+    try {
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(userData));
+    } catch (e) {}
   };
 
-  // register: same shape as login returns from backend
   const register = async (registerDto) => {
     const data = await api('/auth/register', {
       method: 'POST',
@@ -74,17 +90,15 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  // logout
   const logout = async () => {
     await setToken(null);
     setUser(null);
-    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem(USER_KEY);
   };
 
-  // update user in context + storage
   const updateUser = async (newData) => {
     setUser(newData);
-    await AsyncStorage.setItem('user', JSON.stringify(newData));
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(newData));
   };
 
   return (

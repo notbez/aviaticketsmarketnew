@@ -1,22 +1,64 @@
+// components/FlightCard.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 
 export default function FlightCard({ item, onBook }) {
+  const firstSegment = item?.segments?.[0];
+  const lastSegment = item?.segments?.[item.segments.length - 1];
+
+  const firstFlight = firstSegment?.flights?.[0] || null;
+  const lastFlight =
+    lastSegment?.flights?.[lastSegment.flights.length - 1] || null;
+
+  // форматируем время
+  const formatTime = (iso) => {
+    if (!iso) return '-';
+    try {
+      const d = new Date(iso);
+      return d.toISOString().substring(11, 16); // HH:mm
+    } catch {
+      return iso;
+    }
+  };
+
+  const airline = firstFlight?.marketingAirline || 'Авиакомпания';
+  const flightNumber = firstFlight?.flightNumber || '—';
+
+  const departTime = formatTime(item.departTime);
+  const arrivalTime = formatTime(item.arrivalTime);
+
+  const stops = item.stopsCount || 0;
+  const availableSeats =
+    firstFlight?.availableSeats ?? lastFlight?.availableSeats ?? null;
+
   return (
     <View style={styles.cardWrapper}>
-
       <View style={styles.card}>
-
-        {/* Заголовок */}
+        {/* Верхняя строка: авиакомпания + цена */}
         <View style={styles.headerRow}>
           <View style={styles.airlineRow}>
-            <Image source={{ uri: item.logo }} style={styles.logo} />
-            <Text style={styles.airline}>{item.provider}</Text>
+            <Image
+              source={require('../assets/plane.png')}
+              style={styles.logo}
+            />
+            <Text style={styles.airline}>{airline}</Text>
           </View>
-          <Text style={styles.price}>{typeof item.price === 'number' ? item.price.toLocaleString('ru-RU') : item.price} ₽</Text>
+
+          <View style={{ alignItems: 'flex-end' }}>
+  <Text style={styles.price}>
+    {item.price?.toLocaleString('ru-RU')} ₽
+  </Text>
+
+  {/* Показываем тарифы: например "3 тарифа" */}
+  {item.fares && item.fares.length > 1 && (
+    <Text style={styles.tariffCount}>
+      {item.fares.length} тарифа
+    </Text>
+  )}
+</View>
         </View>
 
-        {/* Маршрут с самолетом и пунктиром */}
+        {/* FROM → TO */}
         <View style={styles.routeArcBlock}>
           <Text style={styles.code}>{item.from}</Text>
 
@@ -32,53 +74,56 @@ export default function FlightCard({ item, onBook }) {
           <Text style={styles.code}>{item.to}</Text>
         </View>
 
-        {/* Страны */}
+        {/* Страны (убираем или оставляем как есть?) */}
         <View style={styles.countryRow}>
-          <Text style={styles.country}>{item.fromCountry}</Text>
-          <Text style={styles.country}>{item.toCountry}</Text>
+          <Text style={styles.country}>{firstSegment?.originCountry || ''}</Text>
+          <Text style={styles.country}>{lastSegment?.destinationCountry || ''}</Text>
         </View>
 
-        {/* Информация блока 1 */}
+        {/* Блок инфо №1 */}
         <View style={styles.infoRow}>
           <View>
             <Text style={styles.label}>Вылет</Text>
-            <Text style={styles.value}>{item.departTime}</Text>
+            <Text style={styles.value}>{departTime}</Text>
           </View>
+
           <View>
-            <Text style={styles.label}>Номер рейса</Text>
-            <Text style={styles.value}>{item.flightNumber}</Text>
+            <Text style={styles.label}>Рейс</Text>
+            <Text style={styles.value}>{flightNumber}</Text>
           </View>
         </View>
 
-        {/* Информация блока 2 */}
+        {/* Блок инфо №2 */}
         <View style={styles.infoRow}>
           <View>
             <Text style={styles.label}>Длительность</Text>
-            <Text style={styles.value}>{item.duration}</Text>
+            <Text style={styles.value}>
+              {item.duration || firstFlight?.duration || '—'}
+            </Text>
           </View>
+
           <View>
             <Text style={styles.label}>Класс</Text>
-            <Text style={styles.value}>{item.class}</Text>
+            <Text style={styles.value}>{firstFlight?.serviceClass || '—'}</Text>
           </View>
         </View>
 
-        {/* Дополнительная информация */}
-        {(item.stops > 0 || item.availableSeats <= 5) && (
+        {/* Доп. инфо */}
+        {(stops > 0 || (availableSeats !== null && availableSeats <= 5)) && (
           <View style={styles.additionalInfo}>
-            {item.stops > 0 && (
-              <Text style={styles.warningText}>
-                🔄 {item.stops} пересадка{item.stops > 1 ? 'и' : ''}
-              </Text>
+            {stops > 0 && (
+              <Text style={styles.warningText}>🔄 {stops} пересадки</Text>
             )}
-            {item.availableSeats <= 5 && (
+
+            {availableSeats !== null && availableSeats <= 5 && (
               <Text style={styles.warningText}>
-                ⚠️ Осталось мест: {item.availableSeats}
+                ⚠️ Осталось мест: {availableSeats}
               </Text>
             )}
           </View>
         )}
 
-        {/* Пунктир */}
+        {/* Разделитель */}
         <View style={styles.dashedSeparator} />
 
         {/* Кнопка */}
@@ -87,16 +132,14 @@ export default function FlightCard({ item, onBook }) {
         </TouchableOpacity>
       </View>
 
-      {/* Вырезы билета слева и справа */}
+      {/* Вырезы */}
       <View style={styles.cutLeft} />
       <View style={styles.cutRight} />
-
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
   cardWrapper: {
     marginBottom: 28,
     position: 'relative',
@@ -112,7 +155,6 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
 
-  /* Вырезы */
   cutLeft: {
     position: 'absolute',
     left: -12,
@@ -243,6 +285,7 @@ const styles = StyleSheet.create({
     marginTop: 25,
     marginBottom: 25,
   },
+
   button: {
     backgroundColor: '#29A9E0',
     paddingVertical: 14,
@@ -254,5 +297,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
+  },
+  tariffCount: {
+    fontSize: 12,
+    color: '#7a7a7a',
+    marginTop: 2,
   },
 });

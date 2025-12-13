@@ -1,4 +1,5 @@
 export interface ReservationCreateRequest {
+  offerId: string;
   ContactPhone?: string;
   ContactEmails?: string[];
   RefuseToReceiveAutomaticRoundTripDiscountForRailwayTickets?: boolean;
@@ -119,4 +120,3 @@ export interface OrderListResponse {
   Orders: unknown[];
   TotalQuantity: number;
 }
-

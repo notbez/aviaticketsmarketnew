@@ -37,6 +37,7 @@ import SeatSelectionScreen from '../screens/SeatSelectionScreen';
 import PassengerInfoScreen from '../screens/PassengerInfoScreen';
 import BookingScreen from '../screens/BookingScreen';
 import PaymentScreen from '../screens/PaymentScreen';
+import TicketDetailsScreen from '../screens/TicketDetailsScreen';
 
 const Stack = createStackNavigator();
 
@@ -75,6 +76,8 @@ export default function RootNavigator() {
       <Stack.Screen name="SupportOptions" component={SupportOptionsScreen} />
       <Stack.Screen name="Faq" component={FaqScreen} />
       <Stack.Screen name="Support" component={SupportScreen} />
+
+      <Stack.Screen name="TicketDetails" component={TicketDetailsScreen}/>
     </Stack.Navigator>
   );
 }

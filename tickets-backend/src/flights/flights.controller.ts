@@ -1,5 +1,5 @@
 // flights.controller.ts
-import { Controller, Get, Post, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Query, Logger, Body } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 
 @Controller('flights')
@@ -20,14 +20,23 @@ export class FlightsController {
   }
 
   @Get('search')
-  search(@Query() query: any) {
+  async search(@Query() query: any) {
     this.logger.log('GET /flights/search called');
-    return this.flightsService.search(query);
+    return await this.flightsService.search(query);
   }
 
   @Post('search')
-  searchPost() {
+  async searchPost(@Body() body: any) {
     this.logger.log('=== POST /flights/search called ===');
-    return this.flightsService.search({});
+    this.logger.log(`Body received: ${JSON.stringify(body)}`);
+    return await this.flightsService.search(body);
+  }
+
+  // добавьте в imports: Body уже есть
+  @Post('fare-info')
+  async fareInfo(@Body() body: any) {
+    this.logger.log('=== POST /flights/fare-info called ===');
+    this.logger.log(`Body received for fare-info: ${JSON.stringify(body)}`);
+    return await this.flightsService.getFareInfo(body);
   }
 }

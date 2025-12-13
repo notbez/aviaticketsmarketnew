@@ -98,6 +98,10 @@ export class BookingService {
     const reservationRequest: ReservationCreateRequest | undefined =
       body?.onelyaReservation || body?.reservationRequest;
 
+      if (!reservationRequest?.offerId) {
+        throw new BadRequestException('offerId is required for Onelya reservation');
+      }
+
     if (
       !reservationRequest ||
       !Array.isArray(reservationRequest.ReservationItems) ||
@@ -126,9 +130,10 @@ export class BookingService {
       const data = await this.onelyaService.createReservation(
         reservationRequest,
       );
-      const providerBookingId = data?.OrderId
-        ? String(data.OrderId)
-        : randomUUID();
+      const providerData = data as any;
+      const providerBookingId = providerData?.OrderId
+  ? String(providerData.OrderId)
+  : undefined;
 
       // Сохраняем в MongoDB
       const bookingPayload = body?.localBooking ?? body;
@@ -154,7 +159,7 @@ export class BookingService {
         provider: 'onelya',
         payment: {
           paymentStatus: 'pending',
-          amount: bookingPayload.price || data?.Amount || 0,
+          amount: bookingPayload.price || providerData?.Amount || 0,
           currency: 'RUB',
         },
         seat: bookingPayload.seat || '12A',

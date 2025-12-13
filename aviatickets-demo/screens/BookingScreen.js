@@ -27,53 +27,54 @@ export default function BookingScreen({ route, navigation }) {
       Alert.alert('Ошибка', 'Необходима авторизация');
       return;
     }
-
+  
+    if (!flight?.offerId) {
+      Alert.alert('Ошибка', 'Нет offerId рейса');
+      return;
+    }
+  
     try {
       setLoading(true);
-
-      const body = {
-        from: flight?.from,
-        to: flight?.to,
-        date: flight?.date,
-        price: flight?.price,
-        flightNumber: flight?.flightNumber,
-        departTime: flight?.departTime,
-        arriveTime: flight?.arriveTime,
-        passengers: passengers || [],
-        contact: contactInfo || {},
-        selectedSeats: selectedSeats || [],
-        cabinClass: cabinClass || 'Economy',
-      };
-
+  
+      const {
+        offerId,
+        selectedBrandId,
+        passengers,
+        contactInfo,
+        flight,
+      } = route.params || {};
+  
       const json = await api('/booking/create', {
         method: 'POST',
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          offerId: flight.offerId,
+          selectedBrandId: flight.selectedBrandId,
+          passengers,
+          contact: contactInfo,
+        }),
       });
-      console.log('Booking response:', json);
-      
-      // Проверяем успешность создания бронирования
-      const bookingId = json._id || json.booking?.id || json.id;
-      
-      if (json.ok === true && bookingId) {
-        Alert.alert(
-          'Успешно!',
-          'Бронирование создано',
-          [
-            {
-              text: 'OK',
-              onPress: () => navigation.navigate('MainTabs', { screen: 'Tickets' })
-            }
-          ]
-        );
-      } else {
+  
+      console.log('Reservation/Create response:', json);
+  
+      if (!json?.OrderId) {
         Alert.alert(
           'Ошибка бронирования',
-          json.error || 'Неизвестная ошибка',
+          json?.Error?.Message || 'Не удалось создать бронирование'
         );
+        return;
       }
+  
+      // 👉 УСПЕХ
+      navigation.navigate('Payment', {
+        orderId: json.OrderId,
+        amount: json.Amount,
+        currency: json.Currency || 'RUB',
+        flight,
+      });
+  
     } catch (err) {
       console.error('Booking error:', err);
-      Alert.alert('Ошибка', err.message || 'Не удалось оформить бронирование');
+      Alert.alert('Ошибка', err.message || 'Ошибка бронирования');
     } finally {
       setLoading(false);
     }

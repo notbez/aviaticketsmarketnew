@@ -16,13 +16,10 @@ import { FontAwesome } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-// ❌ Google auth отключено — удалено
-// import * as Google from 'expo-auth-session/providers/google';
 import * as AppleAuthentication from 'expo-apple-authentication';
-// ❌ WebBrowser нужен только для Google
-// import * as WebBrowser from 'expo-web-browser';
-
-// WebBrowser.maybeCompleteAuthSession(); // ❌ больше не нужно
+import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
+import { startGoogleAuth, startYandexAuth, startMailRuAuth } from '../services/authProviders';
 
 export default function LoginScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -31,8 +28,14 @@ export default function LoginScreen({ route, navigation }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ❌ Полностью удалён Google.useAuthRequest()
-  // const [request, response, promptAsync] = Google.useAuthRequest({...});
+  const REDIRECT_URI = AuthSession.makeRedirectUri({
+    // expo managed: use your slug; для продакшна будет другой
+    useProxy: true,
+  });
+
+  const GOOGLE_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || '<YOUR_GOOGLE_CLIENT_ID>';
+  const YANDEX_CLIENT_ID = process.env.EXPO_PUBLIC_YANDEX_CLIENT_ID || '<YOUR_YANDEX_CLIENT_ID>';
+  const MAILRU_CLIENT_ID = process.env.EXPO_PUBLIC_MAILRU_CLIENT_ID || '<YOUR_MAILRU_CLIENT_ID>';
 
   const validateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -84,6 +87,8 @@ export default function LoginScreen({ route, navigation }) {
       setLoading(false);
     }
   };
+  
+  console.log("REDIRECT:", AuthSession.makeRedirectUri({ useProxy: true }));
 
   const handleAppleAuth = async () => {
     try {
@@ -129,6 +134,90 @@ export default function LoginScreen({ route, navigation }) {
       console.error('Apple auth error:', e);
     }
   };
+
+
+const handleGoogleAuth = async () => {
+  try {
+    const redirectUri = REDIRECT_URI;
+    const res = await startGoogleAuth();
+    if (res.type !== 'success') return;
+    const code = res.params?.code;
+    const returnedRedirectUri = res.redirectUri;
+    if (!code) throw new Error('No code returned from Google');
+
+    const data = await api('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ code, redirectUri: returnedRedirectUri }),
+    });
+
+    await login(data.accessToken, data.user);
+
+    if (route.params?.returnTo === 'Booking') {
+      navigation.navigate('Booking', route.params.bookingData);
+    } else {
+      navigation.replace('MainTabs');
+    }
+  } catch (e) {
+    Alert.alert('Ошибка', e.message || 'Google авторизация не удалась');
+    console.log('Google error:', e);
+  }
+};
+
+
+const handleYandexAuth = async () => {
+  try {
+    const redirectUri = REDIRECT_URI;
+    const res = await startYandexAuth();
+    if (res.type !== 'success') return;
+    const code = res.params?.code;
+    const returnedRedirectUri = res.redirectUri;
+    if (!code) throw new Error('No code returned from Yandex');
+
+    const data = await api('/auth/yandex', {
+      method: 'POST',
+      body: JSON.stringify({ code, redirectUri: returnedRedirectUri }),
+    });
+
+    await login(data.accessToken, data.user);
+
+    if (route.params?.returnTo === 'Booking') {
+      navigation.navigate('Booking', route.params.bookingData);
+    } else {
+      navigation.replace('MainTabs');
+    }
+  } catch (e) {
+    Alert.alert('Ошибка', e.message || 'Yandex авторизация не удалась');
+    console.log('Yandex error:', e);
+  }
+};
+
+const handleMailRuAuth = async () => {
+  try {
+    const redirectUri = REDIRECT_URI;
+    const res = await startMailRuAuth();
+    if (res.type !== 'success') return;
+    const code = res.params?.code;
+    const returnedRedirectUri = res.redirectUri;
+    if (!code) throw new Error('No code returned from Mail.ru');
+
+    const data = await api('/auth/mail', {
+      method: 'POST',
+      body: JSON.stringify({ code, redirectUri: returnedRedirectUri }),
+    });
+
+    await login(data.accessToken, data.user);
+
+    if (route.params?.returnTo === 'Booking') {
+      navigation.navigate('Booking', route.params.bookingData);
+    } else {
+      navigation.replace('MainTabs');
+    }
+  } catch (e) {
+    Alert.alert('Ошибка', e.message || 'Mail авторизация не удалась');
+    console.log('Mail error:', e);
+  }
+};
+
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -194,14 +283,31 @@ export default function LoginScreen({ route, navigation }) {
           <View style={styles.line} />
         </View>
 
-        {/* ❌ Google кнопка удалена */}
         <View style={styles.socialRow}>
-          {Platform.OS === 'ios' && (
-            <TouchableOpacity style={styles.socialBtn} onPress={handleAppleAuth}>
-              <FontAwesome name="apple" size={20} color="#000" />
-            </TouchableOpacity>
-          )}
-        </View>
+
+  {/* Google */}
+  <TouchableOpacity style={styles.socialBtn} onPress={handleGoogleAuth}>
+    <FontAwesome name="google" size={20} color="#DB4437" />
+  </TouchableOpacity>
+
+  {/* Yandex */}
+  <TouchableOpacity style={styles.socialBtn} onPress={handleYandexAuth}>
+    <FontAwesome name="yahoo" size={20} color="#FFCC00" />
+  </TouchableOpacity>
+
+  {/* Mail.ru */}
+  <TouchableOpacity style={styles.socialBtn} onPress={handleMailRuAuth}>
+    <FontAwesome name="envelope" size={20} color="#168DE2" />
+  </TouchableOpacity>
+
+  {/* Apple */}
+  {Platform.OS === 'ios' && (
+    <TouchableOpacity style={styles.socialBtn} onPress={handleAppleAuth}>
+      <FontAwesome name="apple" size={20} color="#000" />
+    </TouchableOpacity>
+  )}
+
+</View>
       </View>
     </SafeAreaView>
   );

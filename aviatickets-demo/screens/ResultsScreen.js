@@ -1,21 +1,20 @@
-// screen/ResualtsScreen.js
+// screens/ResultsScreen.js
 import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet, SafeAreaView, Image, TouchableOpacity, Modal, ScrollView } from 'react-native';
+import { View, Text, FlatList, StyleSheet, SafeAreaView, TouchableOpacity, Modal, ScrollView } from 'react-native';
 import FlightCard from '../components/FlightCard';
 import { useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
+import { Dimensions } from 'react-native';
 
 export default function ResultsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const route = useRoute();
-  const { results = [], from, to, fromName, toName } = route.params || {};
+  const { results = [], from, to, fromName, toName, raw = [] } = route.params || {};
   const [showJson, setShowJson] = useState(false);
-  
-  const codeJson = require('../code.json');
-  
-  // Получаем названия аэропортов
+  const { width } = Dimensions.get("window");
+
   const getDisplayName = (code, fullName) => {
     if (fullName) return fullName.split('(')[0].trim();
     const airports = {
@@ -28,43 +27,10 @@ export default function ResultsScreen({ navigation }) {
     return airports[code] || code;
   };
 
-  const renderHeader = () => (
-    <>
-      {/* 🔧 FIX: добавили paddingTop здесь */}
-      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.back}>{'<'}</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Выберите рейс</Text>
-        <View style={{width:24}} />
-      </View>
-
-      <View style={styles.routeBox}>
-        <Text style={styles.city}>{getDisplayName(from, fromName)}</Text>
-        <Text style={styles.code}>{from}</Text>
-        <Image source={require('../assets/plane.png')} style={styles.planeIcon} />
-        <Text style={styles.city}>{getDisplayName(to, toName)}</Text>
-        <Text style={styles.code}>{to}</Text>
-      </View>
-
-      {results.length > 0 && (
-        <View style={styles.resultsHeader}>
-          <Text style={styles.resultsCount}>
-            Найдено {results.length} рейс{results.length === 1 ? '' : results.length < 5 ? 'а' : 'ов'}
-          </Text>
-          <Text style={styles.resultsSubtext}>
-            Выберите подходящий вариант
-          </Text>
-        </View>
-      )}
-
-      <View style={{ height: 10 }} /> 
-    </>
-  );
-
   return (
     <SafeAreaView style={styles.safe}>
-      {/* Плавающая кнопка */}
+
+      {/* --- FLOAT BUTTON --- */}
       <TouchableOpacity 
         style={styles.floatingButton}
         onPress={() => setShowJson(true)}
@@ -72,33 +38,90 @@ export default function ResultsScreen({ navigation }) {
         <MaterialIcons name="code" size={24} color="#fff" />
       </TouchableOpacity>
 
-      {/* Модальное окно с JSON */}
-      <Modal
-        visible={showJson}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowJson(false)}
-      >
+      {/* --- JSON MODAL --- */}
+      <Modal visible={showJson} animationType="slide" transparent={true}>
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>code.json</Text>
+              <Text style={styles.modalTitle}>Raw response</Text>
               <TouchableOpacity onPress={() => setShowJson(false)}>
                 <MaterialIcons name="close" size={24} color="#000" />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.jsonScroll}>
               <Text style={styles.jsonText}>
-                {JSON.stringify(codeJson, null, 2)}
+                {JSON.stringify(raw.length ? raw : results, null, 2)}
               </Text>
             </ScrollView>
           </View>
         </View>
       </Modal>
 
+      {/* --- WAVE BACKGROUND OVER EVERYTHING --- */}
+      <View style={styles.waveWrapper}>
+        <Svg width="100%" height={330} style={{ position: 'absolute', top: 0 }}>
+          <Defs>
+            <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
+              <Stop offset="1" stopColor="#1EA6FF" stopOpacity="0.65" />
+            </LinearGradient>
+
+            <LinearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#5FCFFF" stopOpacity="0.3" />
+              <Stop offset="1" stopColor="#1EA6FF" stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+
+          <Path
+            d={`M0 0 L0 230 Q ${width * 0.5} 330 ${width} 230 L${width} 0 Z`}
+            fill="url(#grad)"
+          />
+
+          <Path
+            d={`M0 60 Q ${width * 0.5} 160 ${width} 120 L${width} 0 L0 0 Z`}
+            fill="url(#lightGrad)"
+            opacity="0.6"
+          />
+
+          <Path
+            d={`M0 120 Q ${width * 0.5} 240 ${width} 170 L${width} 0 L0 0 Z`}
+            fill="url(#lightGrad)"
+            opacity="0.4"
+          />
+        </Svg>
+
+        {/* --- CONTENT INSIDE WAVE (TITLE + ROUTE + COUNTER) --- */}
+        <View style={[styles.waveContent, { paddingTop: insets.top + 20 }]}>
+          
+          {/* Back */}
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={{ color: '#fff', fontSize: 26 }}>{'<'}</Text>
+          </TouchableOpacity>
+
+          {/* Title */}
+          <Text style={styles.headerTitle}>Выберите рейс</Text>
+
+          {/* Route */}
+          <View style={styles.routeRow}>
+            <Text style={styles.routeCity}>{getDisplayName(from, fromName)}</Text>
+            <MaterialIcons name="airplanemode-active" size={22} color="#fff" style={{ marginHorizontal: 10 }} />
+            <Text style={styles.routeCity}>{getDisplayName(to, toName)}</Text>
+          </View>
+
+          <Text style={styles.routeCodes}>{from} — {to}</Text>
+
+          {/* Results counter */}
+          <View style={styles.resultsHeader}>
+            <Text style={styles.resultsCount}>{results.length} вариантов</Text>
+            <Text style={styles.resultsSubtext}>Показаны варианты по заданным критериям</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* --- LIST (CARDS GO UNDER THE WAVE) --- */}
       <FlatList
         data={results}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id || `${item.from}-${item.to}-${Math.random()}`}
         renderItem={({ item }) => (
           <View style={styles.cardWrapper}>
             <FlightCard 
@@ -107,23 +130,21 @@ export default function ResultsScreen({ navigation }) {
             />
           </View>
         )}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{
+          paddingTop: 330, // 🚀 всё уходит под волну!
+          paddingBottom: 20,
+        }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Рейсы не найдены</Text>
-            <Text style={styles.emptySubtitle}>
-              Попробуйте изменить параметры поиска
-            </Text>
-            <TouchableOpacity 
-              style={styles.backButton} 
-              onPress={() => navigation.goBack()}
-            >
+            <Text style={styles.emptySubtitle}>Попробуйте изменить параметры поиска</Text>
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
               <Text style={styles.backButtonText}>Изменить поиск</Text>
             </TouchableOpacity>
           </View>
         }
       />
+
     </SafeAreaView>
   );
 }
@@ -131,30 +152,67 @@ export default function ResultsScreen({ navigation }) {
 const styles = StyleSheet.create({
   safe:{ flex:1, backgroundColor:'#fff' },
 
-  // 🔧 FIX: убран paddingTop отсюда
-  topBar:{ 
-    backgroundColor:'#2aa8ff',
-    flexDirection:'row', 
-    alignItems:'center', 
-    justifyContent:'space-between', 
-    paddingHorizontal:16,
-    paddingBottom:12
+  waveWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 330,
+    zIndex: 9999,    // ← СИНЯЯ ВОЛНА ПОВЕРХ СПИСКА
+    elevation: 20,
   },
 
-  back:{ fontSize:24, color:'#fff' },
-  title:{ fontSize:20, fontWeight:'700', color:'#fff' },
-
-  routeBox:{ 
-    backgroundColor:'#2aa8ff',
-    padding:20, 
-    alignItems:'center',
-    borderBottomLeftRadius:20,
-    borderBottomRightRadius:20,
+  waveContent: {
+    paddingHorizontal: 20,
+    zIndex: 30,    // ← КОНТЕНТ ПОВЕРХ ВОЛНЫ
   },
 
-  city:{ color:'#fff', fontSize:16 },
-  code:{ color:'#fff', fontSize:22, fontWeight:'700' },
-  planeIcon:{ width:40, height:40, marginVertical:8 },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+
+  routeRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
+
+  routeCity: {
+    color: '#fff',
+    fontSize: 18,
+  },
+
+  routeCodes: {
+    color: '#fff',
+    fontSize: 14,
+    opacity: 0.8,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  resultsHeader: {
+    marginTop: 18,
+    backgroundColor: '#ffffffdd',
+    padding: 12,
+    borderRadius: 12,
+    alignSelf: 'center',
+  },
+
+  resultsCount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+
+  resultsSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
 
   cardWrapper: {
     marginHorizontal: 16,
@@ -163,7 +221,6 @@ const styles = StyleSheet.create({
 
   emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 60,
     paddingHorizontal: 20,
   },
@@ -178,8 +235,8 @@ const styles = StyleSheet.create({
   emptySubtitle: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
     marginBottom: 20,
+    textAlign: 'center',
   },
 
   backButton: {
@@ -195,24 +252,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  resultsHeader: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#f8f9fa',
-  },
-
-  resultsCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-
-  resultsSubtext: {
-    fontSize: 14,
-    color: '#666',
-  },
-
   floatingButton: {
     position: 'absolute',
     bottom: 20,
@@ -223,12 +262,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0277bd',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+    zIndex: 2000,
   },
 
   modalContainer: {
@@ -248,7 +282,6 @@ const styles = StyleSheet.create({
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
@@ -258,7 +291,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
   },
 
   jsonScroll: {
@@ -269,6 +301,5 @@ const styles = StyleSheet.create({
   jsonText: {
     fontFamily: 'monospace',
     fontSize: 12,
-    color: '#333',
   },
 });

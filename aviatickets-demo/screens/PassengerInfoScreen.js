@@ -14,11 +14,12 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function PassengerInfoScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { flight } = route.params || {};
+  const { flight, selectedFare } = route.params || {};
   const [expandedPassenger, setExpandedPassenger] = useState(0);
   const [showDOBPicker, setShowDOBPicker] = useState(null);
   const [showExpiryPicker, setShowExpiryPicker] = useState(null);
@@ -26,14 +27,16 @@ export default function PassengerInfoScreen({ route, navigation }) {
   const [countryDropdownIndex, setCountryDropdownIndex] = useState(null);
   const [passengers, setPassengers] = useState([
     {
+      lastName: '',
       firstName: '',
-      middleLastName: '',
+      middleName: '',
+      gender: '',
+      citizenship: 'RU',
       dateOfBirth: '',
-      gender: 'Мужской',
-      passport: '',
-      countryOfIssue: '',
+      passportNumber: '',
+      countryOfIssue: 'RU',
       passportExpiryDate: '',
-    },
+    }
   ]);
   const [contactInfo, setContactInfo] = useState({
     firstName: '',
@@ -56,12 +59,14 @@ export default function PassengerInfoScreen({ route, navigation }) {
     setPassengers([
       ...passengers,
       {
+        lastName: '',
         firstName: '',
-        middleLastName: '',
+        middleName: '',
+        citizenship: 'RU',
+        gender: '',
         dateOfBirth: '',
-        gender: 'Мужской',
-        passport: '',
-        countryOfIssue: '',
+        passportNumber: '',
+        countryOfIssue: 'RU',
         passportExpiryDate: '',
       },
     ]);
@@ -79,6 +84,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
     if (token) {
       navigation.navigate('Booking', {
         flight,
+        selectedFare,
         passengers,
         contactInfo,
       });
@@ -94,9 +100,32 @@ export default function PassengerInfoScreen({ route, navigation }) {
       });
     }
   };
-  const formatDate = (d) =>
-    d ? `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth()+1)
-      .toString().padStart(2,'0')}.${d.getFullYear()}` : '';
+  const formatDateISO = (d) => {
+    if (!d) return '';
+    return d.toISOString().split('T')[0];
+    };
+
+    const normalizeRu = (value) => {
+      if (!value) return '';
+      return value
+        .replace(/[^А-Яа-яЁё\- ]/g, '')
+        .toUpperCase();
+    };
+
+    const COUNTRY_MAP = {
+      Россия: 'RU',
+      Узбекистан: 'UZ',
+    };
+
+    const GENDER_MAP = {
+      Мужской: 'M',
+      Женский: 'F',
+    };
+
+    const COUNTRY_LABEL = {
+      RU: 'Россия',
+      UZ: 'Узбекистан',
+    };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -139,25 +168,35 @@ export default function PassengerInfoScreen({ route, navigation }) {
 
               {expandedPassenger === index && (
                 <View style={styles.passengerForm}>
-                  <Text style={styles.label}>Имя</Text>
-                  <TextInput
-                    value={passenger.firstName}
-                    onChangeText={(text) =>
-                      updatePassenger(index, 'firstName', text)
-                    }
-                    style={styles.input}
-                    placeholder="Имя"
-                  />
+                  <Text style={styles.label}>Фамилия</Text>
+<TextInput
+  value={passenger.lastName}
+  onChangeText={(t) =>
+    updatePassenger(index, 'lastName', normalizeRu(t))
+    }
+  style={styles.input}
+  placeholder="Фамилия"
+/>
 
-                  <Text style={styles.label}>Отчество и фамилия</Text>
-                  <TextInput
-                    value={passenger.middleLastName}
-                    onChangeText={(text) =>
-                      updatePassenger(index, 'middleLastName', text)
-                    }
-                    style={styles.input}
-                    placeholder="Отчество и фамилия"
-                  />
+<Text style={styles.label}>Имя</Text>
+<TextInput
+  value={passenger.firstName}
+  onChangeText={(t) =>
+    updatePassenger(index, 'firstName', normalizeRu(t))
+    }
+  style={styles.input}
+  placeholder="Имя"
+/>
+
+<Text style={styles.label}>Отчество (если есть)</Text>
+<TextInput
+  value={passenger.middleName}
+  onChangeText={(t) =>
+    updatePassenger(index, 'middleName', normalizeRu(t))
+    }
+  style={styles.input}
+  placeholder="Отчество"
+/>
 
                   <Text style={styles.label}>Дата рождения</Text>
                   <TouchableOpacity
@@ -170,25 +209,86 @@ export default function PassengerInfoScreen({ route, navigation }) {
   <MaterialIcons name="date-range" size={20} color="#666" />
 </TouchableOpacity>
 
-                  <Text style={styles.label}>Пол</Text>
-                  <TouchableOpacity
-                    style={styles.genderSelector}
-                    onPress={() => toggleGender(index)}
-                  >
-                    <Text style={styles.genderText}>{passenger.gender}</Text>
-                    <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
-                  </TouchableOpacity>
+<Text style={styles.label}>Пол</Text>
 
-                  <Text style={styles.label}>Паспорт</Text>
-                  <TextInput
-                    value={passenger.passport}
-                    onChangeText={(text) =>
-                      updatePassenger(index, 'passport', text)
-                    }
-                    style={styles.input}
-                    placeholder="Введите 9-значный номер паспорта"
-                    keyboardType="numeric"
-                  />
+<TouchableOpacity
+  style={styles.input}
+  onPress={() =>
+    setCountryDropdownIndex(
+      countryDropdownIndex === `gender-${index}` ? null : `gender-${index}`
+    )
+  }
+>
+  <Text style={styles.placeholderText}>
+    {passenger.gender || 'Выберите пол'}
+  </Text>
+  <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
+</TouchableOpacity>
+
+{countryDropdownIndex === `gender-${index}` && (
+  <View style={styles.dropdown}>
+    {['Мужской', 'Женский'].map((g) => (
+      <TouchableOpacity
+        key={g}
+        style={styles.dropdownItem}
+        onPress={() => {
+          updatePassenger(index, 'gender', GENDER_MAP[g]);
+          setCountryDropdownIndex(null);
+        }}
+      >
+        <Text style={styles.dropdownText}>{g}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
+
+                  <Text style={styles.label}>Гражданство</Text>
+
+<TouchableOpacity
+  style={styles.input}
+  onPress={() =>
+    setCountryDropdownIndex(
+      countryDropdownIndex === `cit-${index}` ? null : `cit-${index}`
+    )
+  }
+>
+  <Text style={styles.placeholderText}>
+  {COUNTRY_LABEL[passenger.citizenship] || 'Выберите страну'}
+  </Text>
+  <MaterialIcons name="keyboard-arrow-down" size={20} color="#666" />
+</TouchableOpacity>
+
+{countryDropdownIndex === `cit-${index}` && (
+  <View style={styles.dropdown}>
+    {['Россия', 'Узбекистан'].map((c) => (
+      <TouchableOpacity
+        key={c}
+        style={styles.dropdownItem}
+        onPress={() => {
+          updatePassenger(index, 'citizenship', COUNTRY_MAP[c]);
+          setCountryDropdownIndex(null);
+        }}
+      >
+        <Text style={styles.dropdownText}>{c}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
+
+<Text style={styles.label}>Серия и номер документа</Text>
+<TextInput
+  value={passenger.passportNumber}
+  onChangeText={(t) =>
+    updatePassenger(
+      index,
+      'passportNumber',
+      t.replace(/\D/g, '').slice(0, 10)
+    )
+  }
+  style={styles.input}
+  placeholder="1234567890"
+  keyboardType="numeric"
+/>
 
                   <Text style={styles.label}>Страна выдачи</Text>
                   <TouchableOpacity
@@ -212,7 +312,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
         key={c}
         style={styles.dropdownItem}
         onPress={() => {
-          updatePassenger(index, 'countryOfIssue', c);
+          updatePassenger(index, 'countryOfIssue', COUNTRY_MAP[c]);
           setCountryDropdownIndex(null);
         }}
       >
@@ -247,54 +347,6 @@ export default function PassengerInfoScreen({ route, navigation }) {
             </TouchableOpacity>
           )}
 
-          {/* Contact Info */}
-          <View style={styles.contactCard}>
-            <Text style={styles.contactTitle}>Контактная информация</Text>
-
-            <Text style={styles.label}>Имя</Text>
-            <TextInput
-              value={contactInfo.firstName}
-              onChangeText={(text) =>
-                setContactInfo({ ...contactInfo, firstName: text })
-              }
-              style={styles.input}
-              placeholder="Имя"
-            />
-
-            <Text style={styles.label}>Отчество и фамилия</Text>
-            <TextInput
-              value={contactInfo.middleLastName}
-              onChangeText={(text) =>
-                setContactInfo({ ...contactInfo, middleLastName: text })
-              }
-              style={styles.input}
-              placeholder="Отчество и фамилия"
-            />
-
-            <Text style={styles.label}>Номер телефона</Text>
-            <TextInput
-              value={contactInfo.phone}
-              onChangeText={(text) =>
-                setContactInfo({ ...contactInfo, phone: text })
-              }
-              style={styles.input}
-              placeholder="0123456789"
-              keyboardType="phone-pad"
-            />
-
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={contactInfo.email}
-              onChangeText={(text) =>
-                setContactInfo({ ...contactInfo, email: text })
-              }
-              style={styles.input}
-              placeholder="Введите ваш email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
           <TouchableOpacity style={styles.continueButton} onPress={handleContinue}>
             <View style={styles.continueButtonContent}>
               <View>
@@ -318,7 +370,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
         updatePassenger(
           showDOBPicker,
           'dateOfBirth',
-          formatDate(selected)
+          formatDateISO(selected)
         );
     }}
   />
@@ -335,7 +387,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
         updatePassenger(
           showExpiryPicker,
           'passportExpiryDate',
-          formatDate(selected)
+          formatDateISO(selected)
         );
     }}
   />
