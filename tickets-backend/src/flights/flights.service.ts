@@ -9,6 +9,7 @@ import {
   BrandFarePricingResponse,
 } from '../onelya/dto/avia-search.dto';
 import { flightOfferStore } from './flight-offer.store';
+import { randomUUID } from 'crypto'; 
 
 @Injectable()
 export class FlightsService {
@@ -136,7 +137,7 @@ export class FlightsService {
     }
 
     // Если RoutePricing вернул маршруты — пытаемся дополнить их BrandFarePricing (опционально)
-    const routes = routeResp?.Routes || [];
+    const routes: any[] = routeResp?.Routes || [];
     const enrichedRoutes: any[] = [];
 
     // Выполняем BrandFarePricing для каждого route, но аккуратно — если провайдер не поддерживает/ошибка — оставляем исходный route
@@ -165,16 +166,21 @@ export class FlightsService {
     }
 
     enrichedRoutes.forEach(route => {
-      const offerId = flightOfferStore.save(
-        route,
-        route.Price?.Total || route.Amount || 0,
-        route.Price?.Currency || 'RUB',
-      );
-      
-      route.__offerId = offerId;
+      const offerId = randomUUID(); // генерируем уникальный UUID
+    
+      flightOfferStore.save({
+        offerId,
+        providerRaw: route,
+        amount: route?.CheapestPrice ?? route?.Cost ?? 0,
+        currency: route?.Currency ?? 'RUB',
+      });
+    
+      route.__offerId = offerId; // для карточки фронта
     });
     // Теперь формируем карточки для фронта
-    const cards = enrichedRoutes.map((route: any, idx: number) => this.routeToCard(route, idx));
+    const cards = enrichedRoutes.map((route: any, idx: number) =>
+      this.routeToCard(route as any, idx),
+    );
 
     this.logger.log(`[Onelya] Transformed to ${cards.length} flight cards`);
 
@@ -283,15 +289,14 @@ export class FlightsService {
 
     // Определяем минимальную цену: если route.CheapestPrice есть — берем её; иначе первый fare.amount
     const price =
-      route?.CheapestPrice ??
       route?.Cost ??
-      route?.Price ??
+      route?.CheapestPrice ??
       (fares.length > 0 ? fares[0].amount : null);
 
     return {
       id: route.__offerId,
-providerRouteId: route.Id,
-offerId: route.__offerId,
+      providerRouteId: route.Id,
+      offerId: route.__offerId,
       price: price ? Number(price) : null,
       currency: route?.Currency || 'RUB',
       fares,
@@ -318,7 +323,7 @@ offerId: route.__offerId,
   
       fares.push({
         title: fl?.BrandedFareInfo?.BrandName || 'Тариф',
-        amount: bf?.Prices?.[0]?.Amount ?? bf?.Cost ?? null,
+        amount: bf?.Cost ?? bf?.Prices?.[0]?.Amount ?? null,
         currency: bf?.Prices?.[0]?.Currency ?? route?.Currency ?? 'RUB',
   
         baggage: desc?.BaggageInfo?.Description ?? null,
@@ -327,7 +332,10 @@ offerId: route.__offerId,
         refund: desc?.RefundInfo?.Description ?? null,
         exchange: desc?.ExchangeInfo?.Description ?? null,
   
-        brandId: fl?.BrandedFareInfo?.GdsBrandId ?? null,
+        brandId:
+          fl?.BrandedFareInfo?.BrandId ??
+          fl?.BrandedFareInfo?.GdsBrandId ??
+  null,
         raw: bf,
       });
     }
@@ -350,7 +358,7 @@ offerId: route.__offerId,
     route.Prices.forEach((p: any) => {
       fares.push({
         title: p?.Fare || fareDesc?.BrandedFareInfo?.BrandName || 'Тариф',
-        amount: p?.Amount ?? null,
+        amount: p?.Total ?? p?.Amount ?? null,
         currency: route?.Currency || 'RUB',
 
         baggage: fareDesc?.BaggageInfo?.Description || null,
@@ -634,5 +642,63 @@ offerId: route.__offerId,
     if (!value) return 0;
     if (Array.isArray(value)) return value.length;
     return typeof value === 'number' ? value : 0;
+  }
+
+  private buildPricingRoute(route: any) {
+    if (!Array.isArray(route?.Segments)) {
+      throw new Error('Invalid route: no segments');
+    }
+
+    return {
+      Segments: route.Segments.map((seg: any) => ({
+        Flights: Array.isArray(seg.Flights)
+          ? seg.Flights.map((f: any) => ({
+              MarketingAirlineCode: f.MarketingAirlineCode,
+              OperatingAirlineCode: f.OperatingAirlineCode,
+              FlightNumber: f.FlightNumber,
+              OriginAirportCode: f.OriginAirportCode,
+              DestinationAirportCode: f.DestinationAirportCode,
+              DepartureDateTime: f.DepartureDateTime,
+              ServiceClass: f.ServiceClass,
+              Subclass: f.Subclass ?? f.ServiceSubclass ?? null,
+              FareCode: f.FareCode ?? null,
+              FlightGroup: f.FlightGroup ?? 0,
+              RouteGroup: f.RouteGroup ?? 0,
+            }))
+          : [],
+      })),
+    };
+  }
+
+  async pricingOffer(payload: {
+    route: any;
+    brandFare: any;
+  }) {
+    const { route, brandFare } = payload;
+  
+    this.logger.log('[Flights] Pricing selected route');
+  
+    const pricingResult = await this.onelyaService.pricingRoute({
+      Route: this.buildPricingRoute(route),
+      BrandFare: brandFare,
+    });
+  
+    const offerId = randomUUID();
+  
+    const cost = (pricingResult as any)?.Cost ?? null;
+    const currency = (pricingResult as any)?.Currency ?? 'RUB';
+  
+    flightOfferStore.save({
+      offerId,
+      providerRaw: pricingResult,
+      amount: cost,
+      currency,
+    });
+  
+    return {
+      offerId,
+      amount: cost,
+      currency,
+    };
   }
 }

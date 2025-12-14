@@ -348,10 +348,13 @@ export default function FlightDetailsScreen({ route, navigation }) {
           style={styles.selectSeatsButton}
           onPress={() =>
             navigation.navigate('PassengerInfo', {
+              flight: {
+                ...flight,
+                price: firstFare?.amount,
+              },
               offerId: flight.offerId,
               selectedBrandId: firstFare?.brandId,
-              price: firstFare?.amount,
-                 })
+            })
           }
         >
           <Text style={styles.selectSeatsButtonText}>Продолжить</Text>

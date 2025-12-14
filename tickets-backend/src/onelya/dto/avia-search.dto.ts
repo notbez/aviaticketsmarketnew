@@ -124,6 +124,7 @@ export interface BrandFarePricingRequest {
 }
 
 export interface BrandFarePricingResponse {
+  Id?: string;
   BrandFares: any[];
 }
 

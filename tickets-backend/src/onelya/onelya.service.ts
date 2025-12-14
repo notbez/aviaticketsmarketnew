@@ -58,30 +58,47 @@ function transliterate(value?: string): string | undefined {
 }
 
 function mapPassengerToOnelyaCustomer(p: any) {
-  const citizenship = p.citizenship || 'RU';
+  if (!p.firstName || !p.lastName) {
+    throw new HttpException('Passenger name is required', 400);
+  }
+
+  const isRussianPassport =
+    !p.documentType || p.documentType === 'RussianPassport';
 
   return {
-    CustomerType: p.customerType || 'Adult',
+    CustomerType: 'Adult',
 
-    LastName: transliterate(p.lastName),
-    FirstName: transliterate(p.firstName),
-    MiddleName: p.middleName ? transliterate(p.middleName) : undefined,
+    LastName: isRussianPassport
+      ? p.lastName.toUpperCase()
+      : transliterate(p.lastName),
+
+    FirstName: isRussianPassport
+      ? p.firstName.toUpperCase()
+      : transliterate(p.firstName),
+
+    MiddleName: p.middleName
+      ? isRussianPassport
+        ? p.middleName.toUpperCase()
+        : transliterate(p.middleName)
+      : undefined,
 
     Gender: p.gender === 'M' ? 'Male' : 'Female',
-
     BirthDate: toIsoDate(p.dateOfBirth),
-
-    Citizenship: citizenship,
+    Citizenship: p.citizenship || 'RU',
 
     Document: {
-      DocumentType:
-        citizenship === 'RU' ? 'RussianPassport' : 'ForeignPassport',
+      DocumentType: isRussianPassport
+        ? 'RussianPassport'
+        : 'ForeignPassport',
 
       Number: String(p.passportNumber).replace(/\D/g, ''),
+      CountryOfIssue: isRussianPassport
+        ? 'RU'
+        : (p.countryOfIssue || 'US'),
 
-      CountryOfIssue: p.countryOfIssue || citizenship,
-
-      ExpireDate: toIsoDate(p.passportExpiryDate),
+      ExpireDate: isRussianPassport
+        ? undefined
+        : toIsoDate(p.passportExpiryDate),
     },
   };
 }
@@ -89,20 +106,17 @@ function mapPassengerToOnelyaCustomer(p: any) {
 
 function assertValidProviderRaw(providerRaw: any) {
   if (!providerRaw) {
-    throw new HttpException('ProviderRaw is required', 400);
-  }
-
-  if (providerRaw.Id === 'Obsolete') {
     throw new HttpException(
-      'ProviderRaw is obsolete. Pricing is required before reservation',
+      'ProviderRaw is required',
       400,
     );
   }
 
-  if (
-    Array.isArray(providerRaw.BrandFares) &&
-    providerRaw.BrandFares.length !== 1
-  ) {
+  if (!Array.isArray(providerRaw.BrandFares)) {
+    throw new HttpException('ProviderRaw.BrandFares is required', 400);
+  }
+
+  if (providerRaw.BrandFares.length !== 1) {
     throw new HttpException(
       `Exactly one BrandFare must be selected, got ${providerRaw.BrandFares.length}`,
       400,
@@ -126,7 +140,7 @@ export class OnelyaService {
   ) {
     this.baseUrl =
       this.configService.get<string>('ONELYA_BASE_URL')?.trim() ||
-      'https://api-test.onelya.ru/';
+      'https://api-test.onelya.ru';
     this.login =
       this.configService.get<string>('ONELYA_LOGIN')?.trim() ||
       'trevel_test';
@@ -183,6 +197,16 @@ export class OnelyaService {
     );
   }
 
+  async pricingRoute(body: {
+    Route: any;
+    BrandFare: any;
+  }) {
+    return this.post(
+      '/Avia/V1/Pricing/Route',
+      body,
+    );
+  }
+
   
 
   async createReservation(body: any) {
@@ -205,7 +229,9 @@ export class OnelyaService {
             ProviderRaw: providerRaw,
           },
         ],
-        ContactPhone: body.contact?.phone || '+79990000000',
+        ContactPhone:body.contact?.phone?.startsWith('+')
+          ? body.contact.phone
+          : `+${body.contact?.phone?.replace(/\D/g, '') || '79990000000'}`,
         ContactEmails: body.contact?.email
           ? [body.contact.email]
           : ['test@test.ru'],
@@ -328,10 +354,9 @@ export class OnelyaService {
   }
 
   private buildUrl(endpoint: string): string {
-    if (!endpoint.startsWith('/')) {
-      return `${this.baseUrl}/${endpoint}`;
-    }
-    return `${this.baseUrl}${endpoint}`;
+    const base = this.baseUrl.replace(/\/+$/, '');
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${base}${path}`;
   }
 
   private buildHeaders() {

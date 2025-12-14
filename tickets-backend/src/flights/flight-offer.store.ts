@@ -1,34 +1,21 @@
-import { randomUUID } from 'crypto';
-
-interface StoredOffer {
-  providerRaw: any;
-  amount: number;
-  currency: string;
-  createdAt: number;
-}
-
 class FlightOfferStore {
-  private store = new Map<string, StoredOffer>();
+  private store = new Map<string, any>();
 
-  save(route: any, amount = 0, currency = 'RUB'): string {
-    const offerId = randomUUID();
-
-    this.store.set(offerId, {
-      providerRaw: route,
-      amount,
-      currency,
-      createdAt: Date.now(),
-    });
-
-    return offerId;
+  save(data: {
+    offerId: string;
+    providerRaw: any;
+    amount: number;
+    currency: string;
+  }) {
+    this.store.set(String(data.offerId), data);
   }
 
-  get(offerId: string): StoredOffer | undefined {
-    return this.store.get(offerId);
+  get(offerId: string) {
+    return this.store.get(String(offerId));
   }
 
   delete(offerId: string) {
-    this.store.delete(offerId);
+    this.store.delete(String(offerId));
   }
 }
 

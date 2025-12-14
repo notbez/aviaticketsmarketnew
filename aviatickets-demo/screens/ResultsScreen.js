@@ -121,7 +121,9 @@ export default function ResultsScreen({ navigation }) {
       {/* --- LIST (CARDS GO UNDER THE WAVE) --- */}
       <FlatList
         data={results}
-        keyExtractor={(item) => item.id || `${item.from}-${item.to}-${Math.random()}`}
+        keyExtractor={(item, index) =>
+          item.providerId || `${item.id}-${index}`
+        }
         renderItem={({ item }) => (
           <View style={styles.cardWrapper}>
             <FlightCard 
