@@ -207,7 +207,6 @@ export default function HomeScreen() {
             { paddingTop: insets.top > 20 ? insets.top - 10 : 10 },
           ]}
         >
-          <Text style={styles.welcomeText}>Привет, {username}</Text>
           <Text style={styles.headerTitle}>Найди свой рейс</Text>
         </View>
 
@@ -397,42 +396,6 @@ export default function HomeScreen() {
                 </View>
               )}
             </View>
-          </View>
-
-          {/* ТАРИФ */}
-          <View style={{ marginBottom: 8 }}>
-            <Text style={styles.fieldLabel}>Тариф</Text>
-            <TouchableOpacity
-              style={styles.fieldBox}
-              onPress={() => setShowTariff(!showTariff)}
-            >
-              <MaterialCommunityIcons
-                name="ticket-confirmation"
-                size={22}
-                color="#0277bd"
-                style={{ marginRight: 10 }}
-              />
-              <Text style={styles.fieldValue}>
-                {TARIFFS.find(t => t.value === tariff)?.label || tariff}
-              </Text>
-            </TouchableOpacity>
-
-            {showTariff && (
-              <View style={styles.dropdown}>
-                {TARIFFS.map((t) => (
-                  <TouchableOpacity
-                    key={t.value}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setTariff(t.value);
-                      setShowTariff(false);
-                    }}
-                  >
-                    <Text style={styles.dropdownText}>{t.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
           </View>
 
           {/* SEARCH BUTTON */}

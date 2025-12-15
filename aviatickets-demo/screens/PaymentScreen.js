@@ -1,5 +1,7 @@
+// screens/PaymentScreen.js
 import React, { useState } from 'react';
 import {
+  SafeAreaView,
   View,
   Text,
   StyleSheet,
@@ -9,15 +11,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../lib/api';
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const insets = useSafeAreaInsets();
   const { token } = useAuth();
 
-  const { orderId, amount, currency = '₽' } = route.params || {};
+  const { orderId, amount = 0, currency = '₽' } = route.params || {};
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
@@ -33,24 +37,7 @@ export default function PaymentScreen() {
 
     try {
       setLoading(true);
-
-      // 🔹 Эмуляция успешной внешней оплаты
-      // Здесь позже можно подключить реальную платёжку
-
-      const json = await api('/onelya/order/reservation/confirm', {
-        method: 'POST',
-        body: JSON.stringify({
-          orderId,
-          paymentMethod: 'Cashless',
-        }),
-      });
-
-      console.log('Reservation/Confirm response:', json);
-
-      if (!json?.OrderId) {
-        Alert.alert('Ошибка оплаты', 'Бронирование не подтверждено');
-        return;
-      }
+      await new Promise(resolve => setTimeout(resolve, 800));
 
       Alert.alert(
         'Успешно!',
@@ -61,126 +48,209 @@ export default function PaymentScreen() {
             onPress: () =>
               navigation.reset({
                 index: 0,
-                routes: [
-                  { name: 'MainTabs', params: { screen: 'Tickets' } },
-                ],
+                routes: [{ name: 'MainTabs', params: { screen: 'Tickets' } }],
               }),
           },
         ]
       );
-    } catch (err) {
-      console.error('Payment error:', err);
-      Alert.alert('Ошибка', err.message || 'Ошибка при оплате');
+    } catch {
+      Alert.alert('Ошибка', 'Ошибка при оплате');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.safe}>
+      {/* HEADER */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Назад</Text>
+          <MaterialIcons name="arrow-back" size={24} color="#111" />
         </TouchableOpacity>
-        <Text style={styles.title}>Оплата</Text>
+
+        <Text style={styles.headerTitle}>Оплата</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Сумма к оплате</Text>
-          <Text style={styles.amount}>
-            {(amount || 0).toLocaleString('ru-RU')} {currency}
-          </Text>
-        </View>
+      <View style={styles.headerDivider} />
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Способ оплаты</Text>
-          <TouchableOpacity style={styles.paymentMethod}>
-            <Text style={styles.methodText}>💳 Банковская карта</Text>
+      {/* CONTENT */}
+      <View style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* CARD */}
+          <View style={styles.cardWrapper}>
+            <View style={styles.card}>
+              <Text style={styles.cardBrand}>МИР</Text>
+
+              <Text style={styles.cardNumber}>
+                2200 1234 5678 9012
+              </Text>
+
+              <View style={styles.cardFooter}>
+                <View>
+                  <Text style={styles.cardLabel}>Срок действия</Text>
+                  <Text style={styles.cardValue}>12 / 27</Text>
+                </View>
+
+                <View style={styles.cardChip} />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* BOTTOM */}
+        <View style={[styles.bottomBlock, { paddingBottom: insets.bottom + 20 }]}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Итого к оплате</Text>
+            <Text style={styles.totalAmount}>
+              {Number(amount).toLocaleString('ru-RU')} {currency}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.payButton, loading && styles.payButtonDisabled]}
+            onPress={handlePayment}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.payButtonText}>Оплатить</Text>
+            )}
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={[styles.payButton, loading && styles.payButtonDisabled]}
-          onPress={handlePayment}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.payButtonText}>Оплатить</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
     backgroundColor: '#fff',
-    paddingTop: 50,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  backButton: {
-    fontSize: 16,
-    color: '#0277bd',
-    marginBottom: 10,
+  flex: {
+    flex: 1,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+
+  /* Header */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    backgroundColor: '#fff',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
     color: '#111',
   },
-  content: {
-    flex: 1,
+  headerDivider: {
+    height: 1,
+    backgroundColor: '#eee',
+  },
+
+  /* Scroll */
+  scrollContent: {
     padding: 20,
+    paddingBottom: 10,
+  },
+
+  /* Card */
+  cardWrapper: {
+    alignItems: 'center',
+    marginTop: 10,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    width: '100%',
+    aspectRatio: 1.586,
+    backgroundColor: '#1EA6FF',
+    borderRadius: 18,
     padding: 20,
-    marginBottom: 15,
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  sectionTitle: {
+  cardBrand: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  cardNumber: {
+    color: '#fff',
+    fontSize: 22,
+    letterSpacing: 2,
+    fontWeight: '600',
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  cardLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  cardValue: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    color: '#fff',
+    fontWeight: '600',
+    marginTop: 2,
   },
-  amount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#0277bd',
+  cardChip: {
+    width: 46,
+    height: 34,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
-  paymentMethod: {
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+
+  /* Bottom */
+  bottomBlock: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
-  methodText: {
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  totalLabel: {
     fontSize: 16,
+    color: '#666',
+  },
+  totalAmount: {
+    fontSize: 22,
+    fontWeight: '700',
     color: '#111',
   },
+
+  /* Button */
   payButton: {
     backgroundColor: '#0277bd',
-    padding: 18,
+    paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
   },
   payButtonDisabled: {
-    backgroundColor: '#90caf9',
+    opacity: 0.6,
   },
   payButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

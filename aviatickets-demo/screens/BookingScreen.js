@@ -13,7 +13,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../lib/api';
+import { saveOrder } from '../lib/mockOrders';
 
 export default function BookingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
@@ -28,45 +28,39 @@ export default function BookingScreen({ route, navigation }) {
       return;
     }
   
-    if (!flight?.offerId) {
-      Alert.alert('Ошибка', 'Нет offerId рейса');
+    if (!flight) {
+      Alert.alert('Ошибка', 'Нет данных о рейсе');
       return;
     }
   
     try {
       setLoading(true);
   
-      const json = await api('/booking/create', {
-        method: 'POST',
-        body: JSON.stringify({
-          offerId: flight.offerId,
-          selectedBrandId: flight.selectedBrandId,
-          passengers,
-          contact: contactInfo,
-        }),
-      });
+      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   
-      console.log('Reservation/Create response:', json);
+      const mockOrder = {
+        orderId,
+        status: 'PAID',
+        createdAt: new Date().toISOString(),
+        flight: {
+          ...flight,
+          cabinClass,
+        },
+        passengers,
+        contactInfo,
+      };
   
-      if (!json?.OrderId) {
-        Alert.alert(
-          'Ошибка бронирования',
-          json?.Error?.Message || 'Не удалось создать бронирование'
-        );
-        return;
-      }
+      await saveOrder(mockOrder);
   
-      // 👉 УСПЕХ
       navigation.navigate('Payment', {
-        orderId: json.OrderId,
-        amount: json.Amount,
-        currency: json.Currency || 'RUB',
-        flight,
+        orderId,
+        amount: flight.price,
+        currency: 'RUB',
       });
   
     } catch (err) {
-      console.error('Booking error:', err);
-      Alert.alert('Ошибка', err.message || 'Ошибка бронирования');
+      console.error('Booking mock error:', err);
+      Alert.alert('Ошибка', 'Не удалось создать бронирование');
     } finally {
       setLoading(false);
     }

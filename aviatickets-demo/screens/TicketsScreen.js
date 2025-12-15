@@ -1,5 +1,5 @@
 // screens/TicketsScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -12,7 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../lib/api';
+import { getOrders } from '../lib/mockOrders';
 
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -21,65 +21,68 @@ export default function TicketsScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (token) loadOrders();
+    if (token) {
+      loadOrders();
+    }
   }, [token]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await api('/onelya/order/info/order-list', {
-        method: 'POST',
-        body: JSON.stringify({ Date: new Date().toISOString().slice(0, 10) })
-        });
-      setOrders(data?.Orders || []);
+      const data = await getOrders();
+      setOrders(data || []);
     } catch (e) {
-      console.error('OrderList error', e);
+      console.error('Load orders error:', e);
     } finally {
       setLoading(false);
     }
   };
 
   const renderOrder = (order) => {
-    const route = order.Routes?.[0];
-    const segment = route?.Segments?.[0];
+    const { flight } = order;
+
+    if (!flight) return null;
 
     return (
-      <View key={order.OrderId} style={styles.bookingCard}>
+      <View key={order.orderId} style={styles.bookingCard}>
+        {/* Header */}
         <View style={styles.cardHeader}>
           <View style={styles.airlineLogo}>
             <Text style={styles.airlineLogoText}>
-              {segment?.MarketingAirline?.Code || '✈️'}
+              {flight.airline?.charAt(0) || '✈️'}
             </Text>
           </View>
           <View>
             <Text style={styles.airlineName}>
-              {segment?.MarketingAirline?.Name || 'Авиакомпания'}
+              {flight.airline || 'Авиакомпания'}
             </Text>
             <Text style={styles.flightNumber}>
-              Order #{order.OrderId}
+              Заказ № {order.orderId.slice(0, 8)}
             </Text>
           </View>
         </View>
 
+        {/* Route */}
         <View style={styles.routeInfo}>
           <View style={styles.timeBlock}>
-            <Text style={styles.time}>{segment?.Departure?.Time}</Text>
-            <Text style={styles.cityCode}>{segment?.Departure?.Airport}</Text>
+            <Text style={styles.time}>{flight.departTime}</Text>
+            <Text style={styles.cityCode}>{flight.from}</Text>
           </View>
 
           <View style={styles.durationBlock}>
             <MaterialIcons name="flight" size={16} color="#666" />
             <Text style={styles.durationText}>
-              {order.Status}
+              {flight.duration || 'В пути'}
             </Text>
           </View>
 
           <View style={styles.timeBlock}>
-            <Text style={styles.time}>{segment?.Arrival?.Time}</Text>
-            <Text style={styles.cityCode}>{segment?.Arrival?.Airport}</Text>
+            <Text style={styles.time}>{flight.arriveTime}</Text>
+            <Text style={styles.cityCode}>{flight.to}</Text>
           </View>
         </View>
 
+        {/* Button */}
         <TouchableOpacity
           style={styles.detailsButton}
           onPress={() =>
@@ -105,6 +108,9 @@ export default function TicketsScreen({ navigation }) {
           <View style={styles.emptyContainer}>
             <MaterialIcons name="flight" size={64} color="#ccc" />
             <Text style={styles.emptyText}>Билетов пока нет</Text>
+            <Text style={styles.emptySubtext}>
+              Забронируйте билет — он появится здесь
+            </Text>
           </View>
         ) : (
           orders.map(renderOrder)
@@ -116,47 +122,24 @@ export default function TicketsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
+
   header: {
     paddingHorizontal: 16,
     marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111' },
-  tabsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabActive: {
-    borderBottomColor: '#0277bd',
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#999',
-    fontWeight: '500',
-  },
-  tabTextActive: {
-    color: '#0277bd',
+  headerTitle: {
+    fontSize: 20,
     fontWeight: '700',
+    color: '#111',
   },
-  content: { flex: 1 },
-  contentContainer: { padding: 16, paddingBottom: 40 },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
+
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 40,
   },
+
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -174,6 +157,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+
   bookingCard: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -185,11 +169,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
   },
+
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
   },
+
   airlineLogo: {
     width: 48,
     height: 48,
@@ -204,9 +190,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0277bd',
   },
-  cardHeaderContent: {
-    flex: 1,
-  },
+
   airlineName: {
     fontSize: 16,
     fontWeight: '700',
@@ -217,12 +201,14 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+
   routeInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
+
   timeBlock: {
     alignItems: 'center',
   },
@@ -236,6 +222,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4,
   },
+
   durationBlock: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -247,6 +234,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 4,
   },
+
   detailsButton: {
     backgroundColor: '#0277bd',
     paddingVertical: 12,

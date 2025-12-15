@@ -30,33 +30,6 @@ export default function ResultsScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
 
-      {/* --- FLOAT BUTTON --- */}
-      <TouchableOpacity 
-        style={styles.floatingButton}
-        onPress={() => setShowJson(true)}
-      >
-        <MaterialIcons name="code" size={24} color="#fff" />
-      </TouchableOpacity>
-
-      {/* --- JSON MODAL --- */}
-      <Modal visible={showJson} animationType="slide" transparent={true}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Raw response</Text>
-              <TouchableOpacity onPress={() => setShowJson(false)}>
-                <MaterialIcons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={styles.jsonScroll}>
-              <Text style={styles.jsonText}>
-                {JSON.stringify(raw.length ? raw : results, null, 2)}
-              </Text>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       {/* --- WAVE BACKGROUND OVER EVERYTHING --- */}
       <View style={styles.waveWrapper}>
         <Svg width="100%" height={330} style={{ position: 'absolute', top: 0 }}>
@@ -94,8 +67,8 @@ export default function ResultsScreen({ navigation }) {
         <View style={[styles.waveContent, { paddingTop: insets.top + 20 }]}>
           
           {/* Back */}
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={{ color: '#fff', fontSize: 26 }}>{'<'}</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
+            <MaterialIcons name="arrow-back" size={26} color="#fff" />
           </TouchableOpacity>
 
           {/* Title */}
@@ -167,6 +140,11 @@ const styles = StyleSheet.create({
   waveContent: {
     paddingHorizontal: 20,
     zIndex: 30,    // ← КОНТЕНТ ПОВЕРХ ВОЛНЫ
+  },
+
+  backIcon: {
+    padding: 8,
+    alignSelf: 'flex-start',
   },
 
   headerTitle: {

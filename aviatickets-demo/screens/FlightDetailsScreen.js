@@ -57,7 +57,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
       opacity: interpolate(
         scrollY.value,
         [0, 120],
-        [0.15, 0.35], // слабый → чуть сильнее
+        [0.55, 0.65], // слабый → чуть сильнее
         Extrapolate.CLAMP
       ),
     };
@@ -81,7 +81,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
       {/* Blur (ослабили) */}
       <Animated.View style={[StyleSheet.absoluteFill, blurAnimatedStyle]}>
   <BlurView
-    intensity={30}   // ослабили
+    intensity={20}   // ослабили
     tint="light"
     style={StyleSheet.absoluteFill}
   />
@@ -292,7 +292,7 @@ export default function FlightDetailsScreen({ route, navigation }) {
               <View style={styles.durationBlock}>
                 <MaterialIcons name="flight" size={20} color="#666" />
                 <Text style={styles.durationText}>
-                  {flight?.duration || '—'}
+                  {flight?.duration || ''}
                 </Text>
               </View>
 
