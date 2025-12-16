@@ -3,6 +3,9 @@
     "name": "Aviatickets Demo",
     "slug": "aviatickets-demo",
     "version": "1.0.0",
+    "cli": {
+  "appVersionSource": "app.json"
+},
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
