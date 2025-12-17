@@ -7,4 +7,8 @@ android
 npm-debug.log
 yarn-error.log
 .DS_Store
+assets_temp/fonts
 *.log
+tickets-backend/
+**/*.ttf
+**/*.otf
