@@ -33,7 +33,6 @@ import SupportScreen from '../screens/SupportScreen';
 import SupportOptionsScreen from '../screens/SupportOptionsScreen';
 import PaymentsScreen from '../screens/PaymentsScreen';
 import FlightDetailsScreen from '../screens/FlightDetailsScreen';
-import SeatSelectionScreen from '../screens/SeatSelectionScreen';
 import PassengerInfoScreen from '../screens/PassengerInfoScreen';
 import BookingScreen from '../screens/BookingScreen';
 import PaymentScreen from '../screens/PaymentScreen';

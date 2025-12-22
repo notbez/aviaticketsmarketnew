@@ -365,43 +365,85 @@ this.logger.debug(
     }
   }
 
+  public async virtualPay(providerBookingId: string) {
+  const orderId = this.parseOrderId(providerBookingId);
+
+  const booking = await this.bookingModel.findOne({
+    providerBookingId: String(orderId),
+  });
+
+  if (!booking) {
+    throw new BadRequestException('Booking not found');
+  }
+
+  if (booking.bookingStatus !== 'awaiting_payment') {
+    throw new BadRequestException(
+      'Booking is not awaiting payment',
+    );
+  }
+
+  booking.payment.paymentStatus = 'paid';
+  booking.bookingStatus = 'paid';
+
+  await booking.save();
+
+  return { success: true };
+}
+
   /**
    * Confirm reservation
    */
-  public async confirmOnelya(
-    providerBookingId: string,
-    payload?: Partial<ReservationConfirmRequest>,
-  ) {
-    const orderId = this.parseOrderId(
-      providerBookingId,
-      payload?.OrderId,
-    );
+public async confirmOnelya(providerBookingId: string) {
+  const orderId = this.parseOrderId(providerBookingId);
 
-    const result =
+  const booking = await this.bookingModel.findOne({
+    providerBookingId: String(orderId),
+  });
 
-    await this.onelyaService.recalcReservation({
-  OrderId: orderId,
-});
-      await this.onelyaService.confirmReservation(
-        {
-          OrderId: orderId,
-          ...payload,
-        },
-      );
-
-    const booking =
-      await this.bookingModel.findOne({
-        providerBookingId: String(orderId),
-      });
-
-    if (booking) {
-      booking.bookingStatus = 'ticketed';
-      booking.rawProviderData = result;
-      await booking.save();
-    }
-
-    return result;
+  if (!booking) {
+    throw new BadRequestException('Booking not found');
   }
+
+  if (booking.bookingStatus !== 'paid') {
+    throw new BadRequestException(
+      'Payment not completed',
+    );
+  }
+
+  const result = await this.onelyaService.confirmReservation({
+    OrderId: orderId,
+  });
+
+  booking.bookingStatus = 'ticketed';
+  booking.rawProviderData = result;
+
+  await booking.save();
+
+  return result;
+}
+
+  public async recalcOnelya(providerBookingId: string) {
+  const orderId = this.parseOrderId(providerBookingId);
+
+  const result = await this.onelyaService.recalcReservation({
+    OrderId: orderId,
+  });
+
+  const booking = await this.bookingModel.findOne({
+    providerBookingId: String(orderId),
+  });
+
+  if (!booking) {
+    throw new BadRequestException('Booking not found');
+  }
+
+  booking.bookingStatus = 'awaiting_payment';
+  booking.payment.paymentStatus = 'virtual';
+
+  await booking.save();
+
+  return result;
+}
 
   /**
    * Get blank / ticket

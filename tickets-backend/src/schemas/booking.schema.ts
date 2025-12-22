@@ -48,39 +48,63 @@ export class Booking {
   }>;
 
   // Payment data (secure - no full card data)
-  @Prop({
-    type: {
-      paymentStatus: {
-        type: String,
-        enum: ['pending', 'paid', 'canceled', 'refunded'],
-        default: 'pending',
-      },
-      amount: { type: Number, required: true },
-      currency: { type: String, default: 'RUB' },
-      paymentMethod: { type: String, default: null },
-      paymentProviderId: { type: String, default: null },
-      cardLast4: { type: String, default: null },
-      cardBrand: { type: String, default: null },
+@Prop({
+  type: {
+    paymentStatus: {
+      type: String,
+      enum: [
+        'pending',
+        'virtual',
+        'paid',
+        'canceled',
+        'refunded',
+      ],
+      default: 'pending',
     },
-    _id: false,
-  })
-  payment?: {
-    paymentStatus: 'pending' | 'paid' | 'canceled' | 'refunded';
-    amount: number;
-    currency: string;
-    paymentMethod?: string;
-    paymentProviderId?: string;
-    cardLast4?: string;
-    cardBrand?: string;
-  };
+    amount: { type: Number, required: true },
+    currency: { type: String, default: 'RUB' },
+    paymentMethod: { type: String, default: null },
+    paymentProviderId: { type: String, default: null },
+    cardLast4: { type: String, default: null },
+    cardBrand: { type: String, default: null },
+  },
+  _id: false,
+})
+payment?: {
+  paymentStatus:
+    | 'pending'
+    | 'virtual'
+    | 'paid'
+    | 'canceled'
+    | 'refunded';
+  amount: number;
+  currency: string;
+  paymentMethod?: string;
+  paymentProviderId?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+};
 
   // Booking status
-  @Prop({
-    type: String,
-    enum: ['reserved', 'ticketed', 'canceled'],
-    default: 'reserved',
-  })
-  bookingStatus: 'reserved' | 'ticketed' | 'canceled';
+@Prop({
+  type: String,
+  enum: [
+    'reserved',
+    'awaiting_payment',
+    'paid',
+    'ticketed',
+    'canceled',
+    'voided',
+  ],
+  default: 'reserved',
+})
+bookingStatus:
+  | 'reserved'
+  | 'awaiting_payment'
+  | 'paid'
+  | 'ticketed'
+  | 'canceled'
+  | 'voided';
 
   // Provider data (Onelya)
   @Prop({ default: null })

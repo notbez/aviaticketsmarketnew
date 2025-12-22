@@ -12,7 +12,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { getOrders } from '../lib/mockOrders';
+import { api } from '../lib/api';
 
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -29,10 +29,28 @@ export default function TicketsScreen({ navigation }) {
   const loadOrders = async () => {
     try {
       setLoading(true);
-      const data = await getOrders();
-      setOrders(data || []);
+      const data = await api('/booking');
+
+      // Приводим backend bookings → UI orders
+      const mapped = (data || []).map((b) => ({
+        orderId: b._id,
+        flight: {
+          from: b.from,
+          to: b.to,
+          date: b.departureDate,
+          departTime: b.departTime || '—',
+          arriveTime: b.arriveTime || '—',
+          airline: b.provider || 'ONELYA AIR',
+          cabinClass: b.cabinClass || 'Economy',
+          duration: '',
+        },
+        passengers: b.passengers || [],
+        bookingStatus: b.bookingStatus,
+      }));
+
+      setOrders(mapped);
     } catch (e) {
-      console.error('Load orders error:', e);
+      console.error('Load bookings error:', e);
     } finally {
       setLoading(false);
     }
@@ -40,7 +58,6 @@ export default function TicketsScreen({ navigation }) {
 
   const renderOrder = (order) => {
     const { flight } = order;
-
     if (!flight) return null;
 
     return (
@@ -119,6 +136,8 @@ export default function TicketsScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

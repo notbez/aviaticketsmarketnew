@@ -13,12 +13,12 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
-import { saveOrder } from '../lib/mockOrders';
+import { api } from '../lib/api';
 
 export default function BookingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
-  const { flight, selectedSeats, cabinClass, passengers, contactInfo } =
+  const { flight, cabinClass, passengers, contactInfo } =
     route.params || {};
   const [loading, setLoading] = useState(false);
 
@@ -27,40 +27,36 @@ export default function BookingScreen({ route, navigation }) {
       Alert.alert('Ошибка', 'Необходима авторизация');
       return;
     }
-  
-    if (!flight) {
-      Alert.alert('Ошибка', 'Нет данных о рейсе');
+
+    if (!flight?.offerId) {
+      Alert.alert('Ошибка', 'Отсутствует offerId');
       return;
     }
-  
+
     try {
       setLoading(true);
-  
-      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  
-      const mockOrder = {
-        orderId,
-        status: 'PAID',
-        createdAt: new Date().toISOString(),
-        flight: {
-          ...flight,
-          cabinClass,
-        },
-        passengers,
-        contactInfo,
-      };
-  
-      await saveOrder(mockOrder);
-  
-      navigation.navigate('Payment', {
-        orderId,
-        amount: flight.price,
-        currency: 'RUB',
+
+      const res = await api('/booking/create', {
+        method: 'POST',
+        body: JSON.stringify({
+          offerId: flight.offerId,
+          selectedBrandId: flight.selectedBrandId,
+          passengers,
+          contact: contactInfo,
+        }),
       });
-  
-    } catch (err) {
-      console.error('Booking mock error:', err);
-      Alert.alert('Ошибка', 'Не удалось создать бронирование');
+
+      if (!res?._id) {
+        throw new Error('Booking ID not returned');
+      }
+
+      navigation.navigate('Payment', {
+        bookingId: res._id,
+        amount: res.payment?.amount ?? flight.price,
+        currency: res.payment?.currency ?? '₽',
+      });
+    } catch (e) {
+      Alert.alert('Ошибка', e.message);
     } finally {
       setLoading(false);
     }
@@ -76,44 +72,42 @@ export default function BookingScreen({ route, navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+      <ScrollView contentContainerStyle={styles.contentContainer}>
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Детали рейса</Text>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Маршрут:</Text>
             <Text style={styles.summaryValue}>
-              {flight?.from || 'N/A'} → {flight?.to || 'N/A'}
+              {flight.from} → {flight.to}
             </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Дата:</Text>
-            <Text style={styles.summaryValue}>{flight?.date || 'N/A'}</Text>
+            <Text style={styles.summaryValue}>{flight.date}</Text>
           </View>
+
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Время вылета:</Text>
+            <Text style={styles.summaryLabel}>Время:</Text>
             <Text style={styles.summaryValue}>
-              {flight?.departTime || 'N/A'} — {flight?.arriveTime || 'N/A'}
+              {flight.departTime} — {flight.arriveTime}
             </Text>
           </View>
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Класс:</Text>
-            <Text style={styles.summaryValue}>{cabinClass || 'N/A'}</Text>
+            <Text style={styles.summaryValue}>
+              {cabinClass || 'Economy'}
+            </Text>
           </View>
-          {selectedSeats && selectedSeats.length > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Места:</Text>
-              <Text style={styles.summaryValue}>
-                {selectedSeats.join(', ')}
-              </Text>
-            </View>
-          )}
         </View>
 
         <View style={styles.priceCard}>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Итого:</Text>
             <Text style={styles.priceValue}>
-              {(flight?.price || 0).toLocaleString('ru-RU')} ₽
+              {flight.price.toLocaleString('ru-RU')} ₽
             </Text>
           </View>
         </View>
@@ -124,15 +118,19 @@ export default function BookingScreen({ route, navigation }) {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.bookButtonText}>Подтвердить бронирование</Text>
+            <Text style={styles.bookButtonText}>
+              Подтвердить бронирование
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+/* ===== STYLES — НЕ ТРОНУТЫ ===== */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
@@ -150,7 +148,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111',
   },
-  content: { flex: 1 },
   contentContainer: { padding: 16, paddingBottom: 40 },
   summaryCard: {
     backgroundColor: '#fff',
@@ -166,7 +163,6 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111',
     marginBottom: 16,
   },
   summaryRow: {
@@ -174,48 +170,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111',
-  },
+  summaryLabel: { fontSize: 14, color: '#666' },
+  summaryValue: { fontSize: 14, fontWeight: '600' },
   priceCard: {
     backgroundColor: '#f5f5f5',
     borderRadius: 14,
     padding: 16,
     marginBottom: 16,
   },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  priceLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111',
-  },
-  priceValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0277bd',
-  },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  priceLabel: { fontSize: 18, fontWeight: '600' },
+  priceValue: { fontSize: 24, fontWeight: '700', color: '#0277bd' },
   bookButton: {
     backgroundColor: '#0277bd',
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
   },
-  bookButtonDisabled: {
-    opacity: 0.6,
-  },
-  bookButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  bookButtonDisabled: { opacity: 0.6 },
+  bookButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

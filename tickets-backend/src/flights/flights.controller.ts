@@ -39,12 +39,5 @@ export class FlightsController {
     this.logger.log(`Body received for fare-info: ${JSON.stringify(body)}`);
     return await this.flightsService.getFareInfo(body);
   }
-
-  @Post(':offerId/brand-fares')
-async loadBrandFares(
-  @Param('offerId') offerId: string,
-) {
-  return this.flightsService.loadBrandFares(offerId);
-}
 }
 

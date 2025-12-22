@@ -57,32 +57,6 @@ export class BookingController {
     }
   }
 
-  @Post(':id/confirm')
-@UseGuards(JwtAuthGuard)
-public async confirm(
-  @Request() req,
-  @Param('id') id: string,
-) {
-  const booking = await this.bookingService.getById(id);
-  if (!booking) {
-    return { ok: false, error: 'Booking not found' };
-  }
-
-  if (booking.user.toString() !== req.user.sub) {
-    return { ok: false, error: 'Forbidden' };
-  }
-
-  const result =
-    await this.bookingService.confirmOnelya(
-      booking.providerBookingId!,
-    );
-
-  return {
-    ok: true,
-    result,
-  };
-}
-
   @Get()
   @UseGuards(JwtAuthGuard)
   public async getUserBookings(@Request() req) {
@@ -144,5 +118,69 @@ public async getPdf(
   );
 
   res.send(blank.buffer);
+}
+
+
+@Post(':id/recalc')
+@UseGuards(JwtAuthGuard)
+public async recalc(
+  @Request() req,
+  @Param('id') id: string,
+) {
+  const booking = await this.bookingService.getById(id);
+  if (!booking) return { ok: false, error: 'Booking not found' };
+  if (booking.user.toString() !== req.user.sub)
+    return { ok: false, error: 'Forbidden' };
+
+  const result = await this.bookingService.recalcOnelya(
+    booking.providerBookingId!,
+  );
+
+  return { ok: true, result };
+}
+
+
+@Post(':id/pay')
+@UseGuards(JwtAuthGuard)
+public async pay(
+  @Request() req,
+  @Param('id') id: string,
+) {
+  const booking = await this.bookingService.getById(id);
+  if (!booking) return { ok: false, error: 'Booking not found' };
+  if (booking.user.toString() !== req.user.sub)
+    return { ok: false, error: 'Forbidden' };
+
+  const result = await this.bookingService.virtualPay(
+    booking.providerBookingId!,
+  );
+
+  return { ok: true, result };
+}
+
+  @Post(':id/confirm')
+@UseGuards(JwtAuthGuard)
+public async confirm(
+  @Request() req,
+  @Param('id') id: string,
+) {
+  const booking = await this.bookingService.getById(id);
+  if (!booking) {
+    return { ok: false, error: 'Booking not found' };
+  }
+
+  if (booking.user.toString() !== req.user.sub) {
+    return { ok: false, error: 'Forbidden' };
+  }
+
+  const result =
+    await this.bookingService.confirmOnelya(
+      booking.providerBookingId!,
+    );
+
+  return {
+    ok: true,
+    result,
+  };
 }
 }
