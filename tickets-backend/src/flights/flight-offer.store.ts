@@ -6,6 +6,10 @@ class FlightOfferStore {
     providerRaw: any;
     amount: number;
     currency: string;
+    meta?: {
+      passengers: number;
+      serviceClass: string;
+    };
   }) {
     this.store.set(String(data.offerId), data);
   }

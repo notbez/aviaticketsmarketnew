@@ -103,7 +103,6 @@ function mapPassengerToOnelyaCustomer(p: any) {
   };
 }
 
-
 function assertValidProviderRaw(providerRaw: any) {
   if (!providerRaw) {
     throw new HttpException(
@@ -405,4 +404,3 @@ export class OnelyaService {
     return `${text.length}b`;
   }
 }
-

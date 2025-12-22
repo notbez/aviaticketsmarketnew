@@ -1,5 +1,5 @@
 // flights.controller.ts
-import { Controller, Get, Post, Query, Logger, Body } from '@nestjs/common';
+import { Controller, Get, Post, Query, Logger, Body, Param } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 
 @Controller('flights')
@@ -39,4 +39,12 @@ export class FlightsController {
     this.logger.log(`Body received for fare-info: ${JSON.stringify(body)}`);
     return await this.flightsService.getFareInfo(body);
   }
+
+  @Post(':offerId/brand-fares')
+async loadBrandFares(
+  @Param('offerId') offerId: string,
+) {
+  return this.flightsService.loadBrandFares(offerId);
 }
+}
+

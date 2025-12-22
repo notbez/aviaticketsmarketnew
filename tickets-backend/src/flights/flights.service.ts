@@ -1,4 +1,3 @@
-// flights.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { OnelyaService } from '../onelya/onelya.service';
 import {

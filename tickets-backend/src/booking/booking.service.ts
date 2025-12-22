@@ -378,6 +378,10 @@ this.logger.debug(
     );
 
     const result =
+
+    await this.onelyaService.recalcReservation({
+  OrderId: orderId,
+});
       await this.onelyaService.confirmReservation(
         {
           OrderId: orderId,

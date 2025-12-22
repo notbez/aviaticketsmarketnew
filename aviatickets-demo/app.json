@@ -30,7 +30,7 @@
       "eas": {
         "projectId": "cbd50dd3-8e92-4031-bf47-11d29180a0ba"
       },
-      "apiBase": "https://highland-stockings-wine-combine.trycloudflare.com/api",
+      "apiBase": "http://193.233.103.8:3000/api",
       "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "656373020226-7g189cphp9nbskalq0msd70bfr27qq43.apps.googleusercontent.com",
       "EXPO_PUBLIC_YANDEX_CLIENT_ID": "1f3f4e20e0ed4fe39e26b761664c6240",
       "EXPO_PUBLIC_MAILRU_CLIENT_ID": "019b02c429fb7d14b0b89e0fee923497"
