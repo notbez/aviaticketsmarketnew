@@ -22,39 +22,34 @@ export default function PaymentScreen() {
     route.params || {};
   const [loading, setLoading] = useState(false);
 
-  const handlePayment = async () => {
-    if (!bookingId) {
-      Alert.alert('Ошибка', 'bookingId отсутствует');
-      return;
-    }
+const handlePayment = async () => {
+  try {
+    setLoading(true);
 
-    try {
-      setLoading(true);
+    // 1. Recalc
+    await api(`/booking/${bookingId}/recalc`, { method: 'POST' });
 
-      await api(`/booking/${bookingId}/recalc`, {
-        method: 'POST',
-      });
+    // 2. Virtual pay
+    await api(`/booking/${bookingId}/pay`, { method: 'POST' });
 
-      await api(`/booking/${bookingId}/pay`, {
-        method: 'POST',
-      });
+    // 3. Confirm (СОЗДАЁТ БИЛЕТ)
+    // 3. Confirm (в TEST может не создать билет — это ОК)
+await api(`/booking/${bookingId}/confirm`, { method: 'POST' });
 
-      await api(`/booking/${bookingId}/confirm`, {
-        method: 'POST',
-      });
+// 4. ВСЕГДА идём на экран билета
+navigation.replace('TicketDetails', {
+  bookingId,
+});
 
-      navigation.reset({
-        index: 0,
-        routes: [
-          { name: 'MainTabs', params: { screen: 'Tickets' } },
-        ],
-      });
-    } catch (e) {
-      Alert.alert('Ошибка', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (e) {
+    Alert.alert(
+      'Ошибка оплаты',
+      e.message || 'Не удалось завершить оплату',
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={styles.safe}>

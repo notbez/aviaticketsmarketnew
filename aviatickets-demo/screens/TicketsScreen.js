@@ -103,7 +103,9 @@ export default function TicketsScreen({ navigation }) {
         <TouchableOpacity
           style={styles.detailsButton}
           onPress={() =>
-            navigation.navigate('TicketDetails', { order })
+            navigation.navigate('TicketDetails', {
+  bookingId: order.orderId,
+})
           }
         >
           <Text style={styles.detailsButtonText}>Подробности</Text>

@@ -61,7 +61,6 @@ export default function RootNavigator() {
       {/* Экраны поиска и бронирования */}
       <Stack.Screen name="Results" component={ResultsScreen} />
       <Stack.Screen name="SelectCity" component={SelectCityScreen} />
-      <Stack.Screen name="FlightDetails" component={FlightDetailsScreen} />
       <Stack.Screen name="PassengerInfo" component={PassengerInfoScreen} />
       <Stack.Screen name="Booking" component={BookingScreen} />
       <Stack.Screen name="Payment" component={PaymentScreen} />

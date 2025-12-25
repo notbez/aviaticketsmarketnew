@@ -1,5 +1,5 @@
 export interface ReservationCreateRequest {
-  offerId: string;
+  offerId?: string;
   ContactPhone?: string;
   ContactEmails?: string[];
   RefuseToReceiveAutomaticRoundTripDiscountForRailwayTickets?: boolean;
@@ -20,7 +20,29 @@ export interface ReservationCreateResponse {
 }
 
 export interface ReservationRecalcRequest {
+  
   OrderId: number;
+}
+
+export interface ReservationRecalcResponse {
+  OrderId: number;
+
+  Prices?: Array<{
+    Amount?: number;
+    Currency?: string;
+    PassengerType?: string;
+  }>;
+
+  Price?: {
+    Amount?: number;
+    Currency?: string;
+  };
+
+  Total?: number;
+  Currency?: string;
+
+  // разрешаем остальные поля от Onelya
+  [key: string]: any;
 }
 
 export interface ReservationRecalcResponse {

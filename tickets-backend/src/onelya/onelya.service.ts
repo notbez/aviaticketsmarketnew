@@ -1,3 +1,4 @@
+
 import { HttpService } from '@nestjs/axios';
 import {
   Injectable,
@@ -34,7 +35,6 @@ import {
   OrderListRequest,
   OrderListResponse,
 } from './dto/order-reservation.dto';
-import { flightOfferStore } from '../flights/flight-offer.store';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const CyrillicToTranslit = require('cyrillic-to-translit-js');
 
@@ -57,67 +57,46 @@ function transliterate(value?: string): string | undefined {
   return transliterator.transform(value).toUpperCase();
 }
 
-function mapPassengerToOnelyaCustomer(p: any) {
-  if (!p.firstName || !p.lastName) {
-    throw new HttpException('Passenger name is required', 400);
+function mapPassengerToOnelyaCustomer(p: any, index: number) {
+  if (!p.firstName || !p.lastName || !p.dateOfBirth) {
+    throw new HttpException('Passenger data is incomplete', 400);
   }
 
-  const isRussianPassport =
-    !p.documentType || p.documentType === 'RussianPassport';
-
   return {
-    CustomerType: 'Adult',
+    $type: 'ApiContracts.Order.V1.Reservation.OrderFullCustomerRequest, ApiContracts',
 
-    LastName: isRussianPassport
-      ? p.lastName.toUpperCase()
-      : transliterate(p.lastName),
+    DocumentNumber: String(p.passportNumber || '').replace(/\D/g, ''),
+    DocumentType: p.documentType || 'RussianPassport',
+    DocumentValidTill: null,
 
-    FirstName: isRussianPassport
-      ? p.firstName.toUpperCase()
-      : transliterate(p.firstName),
+    CitizenshipCode: p.citizenship || 'RU',
+    BirthPlace: null,
 
-    MiddleName: p.middleName
-      ? isRussianPassport
-        ? p.middleName.toUpperCase()
-        : transliterate(p.middleName)
-      : undefined,
+    FirstName: transliterate(p.firstName),
+    MiddleName: p.middleName ? transliterate(p.middleName) : null,
+    LastName: transliterate(p.lastName),
 
-    Gender: p.gender === 'M' ? 'Male' : 'Female',
-    BirthDate: toIsoDate(p.dateOfBirth),
-    Citizenship: p.citizenship || 'RU',
+    Sex:
+      p.gender === 'M'
+        ? 'Male'
+        : p.gender === 'F'
+        ? 'Female'
+        : null,
 
-    Document: {
-      DocumentType: isRussianPassport
-        ? 'RussianPassport'
-        : 'ForeignPassport',
-
-      Number: String(p.passportNumber).replace(/\D/g, ''),
-      CountryOfIssue: isRussianPassport
-        ? 'RU'
-        : (p.countryOfIssue || 'US'),
-
-      ExpireDate: isRussianPassport
-        ? undefined
-        : toIsoDate(p.passportExpiryDate),
-    },
+    Birthday: `${toIsoDate(p.dateOfBirth)}T00:00:00`,
+    Index: index + 1,
   };
 }
 
 function assertValidProviderRaw(providerRaw: any) {
-  if (!providerRaw) {
+  if (
+    !providerRaw ||
+    typeof providerRaw.RouteGroup !== 'number' ||
+    !Array.isArray(providerRaw.Flights) ||
+    providerRaw.Flights.length === 0
+  ) {
     throw new HttpException(
-      'ProviderRaw is required',
-      400,
-    );
-  }
-
-  if (!Array.isArray(providerRaw.BrandFares)) {
-    throw new HttpException('ProviderRaw.BrandFares is required', 400);
-  }
-
-  if (providerRaw.BrandFares.length !== 1) {
-    throw new HttpException(
-      `Exactly one BrandFare must be selected, got ${providerRaw.BrandFares.length}`,
+      'ProviderRaw must contain RouteGroup and Flights',
       400,
     );
   }
@@ -196,47 +175,129 @@ export class OnelyaService {
     );
   }
 
-  async pricingRoute(body: {
-    Route: any;
-    BrandFare: any;
-  }) {
-    return this.post(
-      '/Avia/V1/Pricing/Route',
-      body,
-    );
-  }
-
   
 
-  async createReservation(body: any) {
-    const providerRaw = body.route || body.providerRaw;
-    const customers = (body.passengers || []).map(mapPassengerToOnelyaCustomer);
-  
-    assertValidProviderRaw(providerRaw);
+async createReservation(body: any) {
+  const providerRaw = body.route || body.providerRaw;
+  const customers = (body.passengers || []).map((p, i) =>
+  mapPassengerToOnelyaCustomer(p, i),
+);
 
-    this.logger.log(
-      `[Onelya] Reservation/Create Id=${providerRaw.Id}, BrandFares=${providerRaw.BrandFares?.length}`,
-    );
-  
-    return this.post(
-      '/Order/V1/Reservation/Create',
-      {
-        Customers: customers,
-        ReservationItems: [
-          {
-            Provider: 'Onelya',
-            ProviderRaw: providerRaw,
-          },
-        ],
-        ContactPhone:body.contact?.phone?.startsWith('+')
-          ? body.contact.phone
-          : `+${body.contact?.phone?.replace(/\D/g, '') || '79990000000'}`,
-        ContactEmails: body.contact?.email
-          ? [body.contact.email]
-          : ['test@test.ru'],
-      },
-    );
-  }
+  assertValidProviderRaw(providerRaw);
+
+if (!Array.isArray(providerRaw.Flights) || providerRaw.Flights.length === 0) {
+  throw new HttpException(
+    'providerRaw.Flights is required for Reservation/Create',
+    400,
+  );
+}
+
+const flights = providerRaw.Flights.map(f => ({
+  Id: null,
+
+  MarketingAirlineCode: f.MarketingAirlineCode,
+  OperatingAirlineCode: f.OperatingAirlineCode,
+  FlightNumber: f.FlightNumber,
+
+  OriginAirportCode: f.OriginAirportCode,
+  DestinationAirportCode: f.DestinationAirportCode,
+
+  DepartureDateTime: f.DepartureDateTime,
+  ArrivalDateTime: f.ArrivalDateTime,
+
+  ServiceSubclass: f.ServiceSubclass,
+  FareCode: f.FareCode,
+
+  ...(f.BrandedFareInfo && {
+  BrandedFareInfo: {
+    BrandName: f.BrandedFareInfo.BrandName,
+    GdsBrandNotation: f.BrandedFareInfo.GdsBrandNotation,
+    GdsBrandId: f.BrandedFareInfo.GdsBrandId,
+  },
+}),
+
+  Tariff: f.Tariff ?? undefined,
+  Gds: providerRaw.Gds,
+  RouteGroup: providerRaw.RouteGroup,
+}));
+
+
+const reservationItem = {
+  $type: 'ApiContracts.Avia.V1.Reservation.AviaReservationRequest, ApiContracts',
+
+  Gds: providerRaw.Gds,
+  PricingGds: providerRaw.Gds,
+  ServiceClass: providerRaw.ServiceClass ?? 'Economic',
+
+  Flights: flights,
+
+  PaymentMethod: 'Confirm',
+  ProviderPaymentForm: 'Cash',
+
+  RelatedBooking: null,
+  DiscountCodes: null,
+  Interface: null,
+
+  Passengers: body.passengers.map((p, i) => ({
+  Category:
+    p.customerType === 'Infant'
+      ? 'Infant'
+      : p.customerType === 'Child'
+      ? 'Child'
+      : 'Adult',
+  Remarks: null,
+  AdditionalServices: null,
+  OrderCustomerIndex: i + 1,
+})),
+
+  Index: 0,
+  AgentReferenceId: null,
+  AgentPaymentId: null,
+  ClientCharge: null,
+};
+
+
+
+const requestBody: ReservationCreateRequest = {
+  ContactPhone: body.contact?.phone?.startsWith('+')
+    ? body.contact.phone
+    : `+${body.contact?.phone?.replace(/\D/g, '')}`,
+
+  ContactEmails: body.contact?.email
+    ? [body.contact.email]
+    : ['test@test.ru'],
+
+  RefuseToReceiveAutomaticRoundTripDiscountForRailwayTickets: false,
+
+  Customers: customers,
+
+  ReservationItems: [reservationItem],
+
+  CheckDoubleBooking: true,
+  PaymentRemark: null,
+  WaitListApplicationId: null,
+  PushNotificationUrl: null,
+};
+
+
+
+  // 🔥 ВОТ СЮДА
+  this.logger.warn(
+    '[Onelya] FINAL Reservation/Create body',
+    JSON.stringify(requestBody, null, 2),
+  );
+
+  const response = await this.post<
+    ReservationCreateRequest,
+    ReservationCreateResponse
+  >('/Order/V1/Reservation/Create', requestBody);
+
+  this.logger.log(
+    `[Onelya] Reservation created OrderId=${response?.OrderId}`,
+  );
+
+  return response;
+}
   
 
   async recalcReservation(
@@ -331,7 +392,6 @@ export class OnelyaService {
     const headers = this.buildHeaders();
 
     this.logger.log(`[Onelya] POST ${url}`);
-    this.logger.debug(`[Onelya] Request body: ${JSON.stringify(body)}`);
 
     try {
       const response = await firstValueFrom(
@@ -365,7 +425,6 @@ export class OnelyaService {
     return {
       Authorization: `Basic ${token}`,
       Pos: this.pos,
-      PartnerId: this.configService.get('ONELYA_PARTNER_ID'),
       'Content-Type': 'application/json',
       'Accept-Encoding': 'gzip',
     };
@@ -404,3 +463,4 @@ export class OnelyaService {
     return `${text.length}b`;
   }
 }
+

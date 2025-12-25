@@ -123,6 +123,18 @@ export interface BrandFarePricingRequest {
   Interface?: string | null;
 }
 
+// 🔥 АКТУАЛЬНЫЙ BrandFarePricing ПО RouteId
+export interface BrandFarePricingByRouteRequest {
+  RouteId: string;
+
+  AdultQuantity: number;
+  ChildQuantity?: number;
+  BabyWithoutPlaceQuantity?: number;
+  BabyWithPlaceQuantity?: number;
+  YouthQuantity?: number;
+  SeniorQuantity?: number;
+}
+
 export interface BrandFarePricingResponse {
   Id?: string;
   BrandFares: any[];

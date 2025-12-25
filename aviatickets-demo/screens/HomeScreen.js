@@ -149,14 +149,14 @@ export default function HomeScreen() {
         <Svg width={width} height={300} style={{ position: 'absolute', top: 0 }}>
           <Defs>
             <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
-              <Stop offset="1" stopColor="#1EA6FF" stopOpacity="0.65" />
-            </LinearGradient>
+  <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
+  <Stop offset="1" stopColor="#1EA6FF" stopOpacity="1" />
+</LinearGradient>
 
             <LinearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor="#5FCFFF" stopOpacity="0.3" />
-              <Stop offset="1" stopColor="#1EA6FF" stopOpacity="0" />
-            </LinearGradient>
+  <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.18" />
+  <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+</LinearGradient>
           </Defs>
 
           <Path
@@ -170,24 +170,14 @@ export default function HomeScreen() {
           />
 
           <Path
-            d={`
-              M0 60
-              Q ${width * 0.5} 140 ${width} 100
-              L${width} 0 L0 0 Z
-            `}
-            fill="url(#lightGrad)"
-            opacity="0.6"
-          />
+  d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
+  fill="url(#lightGrad)"
+/>
 
           <Path
-            d={`
-              M0 110
-              Q ${width * 0.5} 200 ${width} 150
-              L${width} 0 L0 0 Z
-            `}
-            fill="url(#lightGrad)"
-            opacity="0.4"
-          />
+  d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
+  fill="url(#lightGrad)"
+/>
         </Svg>
       </View>
 

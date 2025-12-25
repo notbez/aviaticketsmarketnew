@@ -88,23 +88,24 @@ payment?: {
   // Booking status
 @Prop({
   type: String,
-  enum: [
-    'reserved',
-    'awaiting_payment',
-    'paid',
-    'ticketed',
-    'canceled',
-    'voided',
-  ],
-  default: 'reserved',
+enum: [
+  'created',
+  'awaiting_payment',
+  'paid',
+  'ticketed',
+  'canceled',
+  'voided',
+],
+default: 'created',
 })
 bookingStatus:
-  | 'reserved'
+  | 'created'
   | 'awaiting_payment'
   | 'paid'
   | 'ticketed'
   | 'canceled'
-  | 'voided';
+  | 'voided'
+  | 'confirm_failed';
 
   // Provider data (Onelya)
   @Prop({ default: null })

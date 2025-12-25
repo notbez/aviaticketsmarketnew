@@ -1,20 +1,25 @@
-class FlightOfferStore {
-  private store = new Map<string, any>();
+export interface FlightOffer {
+  offerId: string;
 
-  save(data: {
-    offerId: string;
-    providerRaw: any;
-    amount: number;
-    currency: string;
-    meta?: {
-      passengers: number;
-      serviceClass: string;
-    };
-  }) {
+
+  providerRoute: any;
+
+
+  providerRaw: any;
+
+  brandFares?: any[] | null;
+
+  __brandFareFlights?: any[];
+}
+
+class FlightOfferStore {
+  private store = new Map<string, FlightOffer>();
+
+  save(data: FlightOffer) {
     this.store.set(String(data.offerId), data);
   }
 
-  get(offerId: string) {
+  get(offerId: string): FlightOffer | undefined {
     return this.store.get(String(offerId));
   }
 

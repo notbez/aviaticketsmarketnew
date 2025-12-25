@@ -1,6 +1,7 @@
 // lib/api.js
 import { API_BASE } from '../constants/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 /**
  * joinUrl - аккуратно соединяет base + endpoint
@@ -19,7 +20,12 @@ function joinUrl(base, endpoint) {
  * - при 401 автоматически очищает authToken и кидает специальную ошибку 'Unauthorized'
  */
 export async function api(endpoint, options = {}) {
-  const token = await AsyncStorage.getItem('authToken');
+  let token = null;
+try {
+  token = await SecureStore.getItemAsync('authToken');
+} catch {
+  token = await AsyncStorage.getItem('authToken');
+}
 
   const headers = {
     'Content-Type': 'application/json',

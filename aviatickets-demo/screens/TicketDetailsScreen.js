@@ -1,5 +1,5 @@
 // screens/TicketDetailsScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -9,35 +9,57 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
+
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
+
+import { api } from '../lib/api';
+import { API_URL } from '../config';
 
 export default function TicketDetailsScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { order } = route.params || {};
-  const [loading, setLoading] = useState(false);
 
-  if (!order) {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <Text>Билет не найден</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+const { bookingId } = route.params;
+const [booking, setBooking] = useState(null);
+const [loading, setLoading] = useState(true);
 
-  const {
-    flight = {},
-    passengers = [],
-    orderId = '',
-  } = order;
+useEffect(() => {
+  const load = async () => {
+    try {
+      const data = await api(`/booking/${bookingId}`);
+      setBooking(data);
+    } catch (e) {
+      Alert.alert('Ошибка', 'Не удалось загрузить билет');
+    } finally {
+      setLoading(false);
+    }
+  };
+  load();
+}, [bookingId]);
+
+if (loading) {
+  return <ActivityIndicator />;
+}
+
+if (!booking) {
+  return <Text>Билет не найден</Text>;
+}
+
+
+  const flight = {
+  from: booking.from,
+  to: booking.to,
+  date: booking.departureDate,
+  departTime: booking.departTime,
+  arriveTime: booking.arriveTime,
+  cabinClass: booking.cabinClass,
+};
+const passengers = booking?.passengers || [];
 
   const formatDate = (d) => {
     if (!d) return '—';
@@ -50,184 +72,11 @@ export default function TicketDetailsScreen() {
     });
   };
 
-  const generatePDF = async () => {
-    try {
-      setLoading(true);
-
-      const passengersHtml =
-        passengers.length > 0
-          ? passengers
-              .map(
-                (p) =>
-                  `${p.lastName || ''} ${p.firstName || ''}`.trim()
-              )
-              .join('<br/>')
-          : '—';
-
-      const html = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8" />
-<style>
-body {
-  background: #f2f4f7;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
-  padding: 24px;
-}
-.ticket {
-  background: #fff;
-  border-radius: 18px;
-  max-width: 420px;
-  margin: auto;
-  overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-}
-.top { padding: 20px; }
-.brand {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.brand-name {
-  font-weight: 800;
-  font-size: 18px;
-  color: #0277bd;
-}
-.etype {
-  font-size: 12px;
-  letter-spacing: 1px;
-  color: #999;
-}
-.route {
-  margin-top: 18px;
-  text-align: center;
-}
-.cities {
-  font-size: 22px;
-  font-weight: 800;
-  color: #111;
-}
-.arrow {
-  margin: 6px 0;
-  font-size: 18px;
-  color: #0277bd;
-}
-.date {
-  font-size: 13px;
-  color: #555;
-}
-.times {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 18px;
-}
-.time-block {
-  text-align: center;
-  flex: 1;
-}
-.label {
-  font-size: 11px;
-  color: #888;
-}
-.value {
-  font-size: 15px;
-  font-weight: 700;
-  margin-top: 4px;
-}
-.divider {
-  margin: 20px 0;
-  border-top: 1px dashed #ddd;
-}
-.bottom {
-  padding: 20px;
-  text-align: center;
-}
-.passenger {
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 12px;
-}
-.qr img {
-  width: 160px;
-  height: 160px;
-}
-.order {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #666;
-  font-family: monospace;
-}
-.footer {
-  margin-top: 10px;
-  font-size: 11px;
-  color: #999;
-}
-</style>
-</head>
-
-<body>
-<div class="ticket">
-  <div class="top">
-    <div class="brand">
-      <div class="brand-name">ONELYA AIR</div>
-      <div class="etype">E-TICKET</div>
-    </div>
-
-    <div class="route">
-      <div class="cities">
-        ${flight.from || '—'} → ${flight.to || '—'}
-      </div>
-      <div class="arrow">✈︎</div>
-      <div class="date">${formatDate(flight.date)}</div>
-    </div>
-
-    <div class="times">
-      <div class="time-block">
-        <div class="label">DEPART</div>
-        <div class="value">${flight.departTime || '—'}</div>
-      </div>
-      <div class="time-block">
-        <div class="label">ARRIVE</div>
-        <div class="value">${flight.arriveTime || '—'}</div>
-      </div>
-      <div class="time-block">
-        <div class="label">CLASS</div>
-        <div class="value">${flight.cabinClass || 'Economy'}</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="divider"></div>
-
-  <div class="bottom">
-    <div class="passenger">${passengersHtml}</div>
-
-    <div class="qr">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${orderId}" />
-    </div>
-
-    <div class="order">
-      ORDER #${orderId.slice(0, 10).toUpperCase()}
-    </div>
-
-    <div class="footer">
-      Show this ticket at the boarding gate
-    </div>
-  </div>
-</div>
-</body>
-</html>
-`;
-
-      const { uri } = await Print.printToFileAsync({ html });
-      await Sharing.shareAsync(uri);
-    } catch (e) {
-      Alert.alert('Ошибка', 'Не удалось создать PDF');
-    } finally {
-      setLoading(false);
-    }
-  };
+  
+  const openBlank = async () => {
+  const url = `${API_URL}/booking/${bookingId}/blank/file`;
+  await Linking.openURL(url);
+};
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -280,17 +129,15 @@ body {
         </View>
 
         {/* BUTTON */}
-        <TouchableOpacity
-          style={styles.button}
-          onPress={generatePDF}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Открыть PDF билет</Text>
-          )}
-        </TouchableOpacity>
+{booking.bookingStatus === 'ticketed' ? (
+  <TouchableOpacity onPress={openBlank}>
+    <Text>Открыть билет (PDF)</Text>
+  </TouchableOpacity>
+) : (
+  <Text style={{ color: '#999', marginTop: 12 }}>
+    Билет будет доступен после подтверждения
+  </Text>
+)}
       </ScrollView>
     </SafeAreaView>
   );

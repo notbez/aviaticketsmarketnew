@@ -36,7 +36,7 @@ export default function BookingScreen({ route, navigation }) {
     try {
       setLoading(true);
 
-      const res = await api('/booking/create', {
+      const response = await api('/booking/create', {
         method: 'POST',
         body: JSON.stringify({
           offerId: flight.offerId,
@@ -46,15 +46,17 @@ export default function BookingScreen({ route, navigation }) {
         }),
       });
 
-      if (!res?._id) {
-        throw new Error('Booking ID not returned');
-      }
+      const booking = response?.booking ?? response;
 
-      navigation.navigate('Payment', {
-        bookingId: res._id,
-        amount: res.payment?.amount ?? flight.price,
-        currency: res.payment?.currency ?? '₽',
-      });
+if (!booking?._id) {
+  throw new Error('Booking ID not returned');
+}
+
+navigation.navigate('Payment', {
+  bookingId: booking._id,
+  amount: booking.payment.amount,
+  currency: booking.payment.currency,
+});
     } catch (e) {
       Alert.alert('Ошибка', e.message);
     } finally {

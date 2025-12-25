@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
 
         // verify token by calling /me
         try {
-          const me = await api('/me');
+          const me = await api('/users/profile');
           setUser(me);
           await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
           await setToken(storedToken); // ensure secure store

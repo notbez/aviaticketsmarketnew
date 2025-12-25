@@ -16,11 +16,13 @@ import { Controller, Post, Body, Get, Param, Res, Request, UseGuards } from '@ne
 import { Response } from 'express';
 import { BookingService } from './booking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { NotFoundException } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import * as streamBuffers from 'stream-buffers';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as bwipjs from 'bwip-js';
+import { ForbiddenException } from '@nestjs/common';
 
 @Controller('booking')
 export class BookingController {
@@ -80,46 +82,45 @@ export class BookingController {
     return res.json(booking);
   }
 
-@Get(':id/pdf')
+@Get(':id/blank/file')
 @UseGuards(JwtAuthGuard)
-public async getPdf(
+async downloadBlank(
   @Request() req,
   @Param('id') id: string,
   @Res() res: Response,
 ) {
   const booking = await this.bookingService.getById(id);
+
   if (!booking) {
-    res.status(404).send('Booking not found');
-    return;
+    throw new NotFoundException('Booking not found');
   }
 
   if (booking.user.toString() !== req.user.sub) {
-    res.status(403).send('Forbidden');
-    return;
+    throw new ForbiddenException('Forbidden');
   }
 
-  if (booking.bookingStatus !== 'ticketed') {
-    res.status(400).send('Booking is not ticketed');
-    return;
+  if (!booking.rawProviderData?.blank?.fileId) {
+    throw new NotFoundException('Blank not found');
   }
 
-  const blank =
-    await this.bookingService.getBlank(
-      booking.providerBookingId!,
-    );
+  const filePath = path.join(
+    process.cwd(),
+    'storage',
+    'blanks',
+    booking.rawProviderData.blank.fileId,
+  );
+
+  if (!fs.existsSync(filePath)) {
+    throw new NotFoundException('Blank file missing');
+  }
 
   res.setHeader(
     'Content-Type',
-    blank.contentType || 'application/pdf',
-  );
-  res.setHeader(
-    'Content-Disposition',
-    `inline; filename=ticket-${id}.pdf`,
+    booking.rawProviderData.blank.contentType || 'application/pdf',
   );
 
-  res.send(blank.buffer);
+  res.sendFile(filePath);
 }
-
 
 @Post(':id/recalc')
 @UseGuards(JwtAuthGuard)

@@ -1,4 +1,4 @@
-// screens/FlightDetailsScreen.js
+// screens/
 import React, { useState, useMemo } from 'react';
 import {
   SafeAreaView,
@@ -677,3 +677,6 @@ const tabStyles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+
+
