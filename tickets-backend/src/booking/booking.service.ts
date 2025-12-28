@@ -116,6 +116,16 @@ if (passengersCount.Infant > passengersCount.Adult) {
 
 let providerRoute = storedOffer.providerRaw;
 
+// ✅ применяем выбранный бренд тарифа
+if (body.brandId) {
+  providerRoute.Flights = providerRoute.Flights.map(f => ({
+    ...f,
+    BrandedFareInfo: {
+      GdsBrandId: body.brandId,
+    },
+  }));
+}
+
 if (typeof providerRoute.RouteGroup !== 'number') {
   providerRoute.RouteGroup = 0;
 }

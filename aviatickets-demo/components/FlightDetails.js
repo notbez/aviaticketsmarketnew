@@ -11,6 +11,7 @@ import {
   Easing
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { API_URL } from '../config';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
@@ -19,7 +20,52 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
   const flight = flightProp || route?.params?.flight;
   if (!flight) return null;
 
-  const fares = Array.isArray(flight.fares) ? flight.fares : [];
+    React.useEffect(() => {
+      let cancelled = false;
+      
+      async function loadBrandFares() {
+        try {
+          setLoadingFares(true);
+        
+          const res = await fetch(`${API_URL}/flights/brand-fares`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              offerId: flight.offerId,
+            }),
+          });
+        
+          const data = await res.json();
+        
+          if (!cancelled) {
+            setFares(data || []);
+          }
+        } catch (e) {
+          console.error('Brand fares error', e);
+        } finally {
+          if (!cancelled) {
+            setLoadingFares(false);
+          }
+        }
+      }
+    
+      loadBrandFares();
+    
+      return () => {
+        cancelled = true;
+      };
+    }, [flight.offerId]);
+
+  const [fares, setFares] = useState([]);
+  const [loadingFares, setLoadingFares] = useState(true);
+
+  React.useEffect(() => {
+    if (fares.length > 0) {
+      setLoadingFares(false);
+    }
+  }, [fares.length]);
   const [selectedFareIndex, setSelectedFareIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('info');
   const [closing, setClosing] = useState(false);
@@ -127,84 +173,92 @@ const priceDiff = (fare) => {
 
       <ScrollView contentContainerStyle={styles.content}>
        {/* ===== TARIFFS ===== */}
-        {fares.length > 0 && (
-          <View style={styles.tariffsWrapper}>
-            <Text style={styles.sectionTitle}>Выберите тариф</Text>
+        {/* ===== LOADING TARIFFS ===== */}
+{loadingFares && (
+  <View style={styles.loaderBox}>
+    <Text style={styles.loaderText}>Ищем доступные тарифы…</Text>
+  </View>
+)}
 
-            {fares.map((fare, index) => {
-              const active = index === selectedFareIndex;
-              const diff = priceDiff(fare);
-              const recommended = index === 1 || fares.length === 1;
+{/* ===== TARIFFS ===== */}
+{!loadingFares && fares.length > 0 && (
+  <View style={styles.tariffsWrapper}>
+    <Text style={styles.sectionTitle}>Выберите тариф</Text>
 
-              return (
-                <TouchableOpacity
-                  key={index}
-                  activeOpacity={0.85}
-                  onPress={() => setSelectedFareIndex(index)}
-                  style={[
-                    styles.fareRow,
-                    active && styles.fareRowActive,
-                  ]}
-                >
-                  {/* LEFT */}
-                  <View style={styles.fareLeft}>
-                    <View
-                      style={[
-                        styles.radioOuter,
-                        active && styles.radioOuterActive,
-                      ]}
-                    >
-                      {active && <View style={styles.radioInner} />}
-                    </View>
+    {fares.map((fare, index) => {
+      const active = index === selectedFareIndex;
+      const diff = priceDiff(fare);
+      const recommended = index === 1 || fares.length === 1;
 
-                    <View style={styles.fareText}>
-                      <View style={styles.fareTitleRow}>
-                        <Text style={styles.fareTitle}>
-                          {safe(fare.title)}
-                        </Text>
+      return (
+        <TouchableOpacity
+          key={index}
+          activeOpacity={0.85}
+          onPress={() => setSelectedFareIndex(index)}
+          style={[
+            styles.fareRow,
+            active && styles.fareRowActive,
+          ]}
+        >
+          {/* LEFT */}
+          <View style={styles.fareLeft}>
+            <View
+              style={[
+                styles.radioOuter,
+                active && styles.radioOuterActive,
+              ]}
+            >
+              {active && <View style={styles.radioInner} />}
+            </View>
 
-                        {recommended && (
-                          <View style={styles.recommendedBadge}>
-                            <Text style={styles.recommendedText}>
-                              Рекомендуем
-                            </Text>
-                          </View>
-                        )}
-                      </View>
+            <View style={styles.fareText}>
+              <View style={styles.fareTitleRow}>
+                <Text style={styles.fareTitle}>
+                  {safe(fare.title)}
+                </Text>
 
-                      <View style={styles.baggageRow}>
-                        <MaterialCommunityIcons
-                          name="bag-checked"
-                          size={14}
-                          color="#666"
-                        />
-                        <Text
-                          style={styles.fareSubtitle}
-                          numberOfLines={2}
-                          ellipsizeMode="tail"
-                        >
-                          {safe(fare.baggage || 'Без багажа')}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* RIGHT */}
-                  <View style={styles.fareRight}>
-                    <Text style={styles.farePrice}>
-                      {formatPrice(fare.amount)}
+                {recommended && (
+                  <View style={styles.recommendedBadge}>
+                    <Text style={styles.recommendedText}>
+                      Рекомендуем
                     </Text>
-                    {diff && (
-                      <Text style={styles.priceDiff}>
-                        {diff}
-                      </Text>
-                    )}
                   </View>
-                </TouchableOpacity>
-              );
-            })}
+                )}
+              </View>
+
+              <View style={styles.baggageRow}>
+                <MaterialCommunityIcons
+                  name="bag-checked"
+                  size={14}
+                  color="#666"
+                />
+                <Text
+                  style={styles.fareSubtitle}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {safe(fare.baggage || 'Без багажа')}
+                </Text>
+              </View>
+            </View>
           </View>
-        )}
+
+          {/* RIGHT */}
+          <View style={styles.fareRight}>
+            <Text style={styles.farePrice}>
+              {formatPrice(fare.amount)}
+            </Text>
+            {diff && (
+              <Text style={styles.priceDiff}>
+                {diff}
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    })}
+  </View>
+)}
 
         {/* ===== TABS ===== */}
         <View style={styles.tabsContainer}>
@@ -387,6 +441,16 @@ const styles = StyleSheet.create({
     color: '#0277bd',
     fontWeight: '700',
   },
+
+  loaderBox: {
+  paddingVertical: 32,
+  alignItems: 'center',
+},
+
+loaderText: {
+  fontSize: 15,
+  color: '#666',
+},
 
   baggageRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
 

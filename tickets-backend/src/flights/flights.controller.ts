@@ -39,5 +39,11 @@ export class FlightsController {
     this.logger.log(`Body received for fare-info: ${JSON.stringify(body)}`);
     return await this.flightsService.getFareInfo(body);
   }
+
+  @Post('brand-fares')
+  async brandFares(@Body() body: any) {
+    this.logger.log('=== POST /flights/brand-fares called ===');
+    return await this.flightsService.getBrandFares(body);
+  }
 }
 

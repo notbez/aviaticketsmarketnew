@@ -26,7 +26,7 @@ export class FlightsService {
    * }
    */
   async search(payload: any) {
-    this.logger.log('=== FLIGHTS SEARCH STARTED (RoutePricing + BrandFarePricing) ===');
+    this.logger.log('=== FLIGHTS SEARCH STARTED (RoutePricing) ===');
     this.logger.debug(`Payload received: ${JSON.stringify(payload)}`);
 
     // Нормализация входа
@@ -112,53 +112,9 @@ export class FlightsService {
 
     const startTime = Date.now();
     let routeResp: any = null;
-    let brandFaresMap = new Map<string, any[]>();
 
     try {
       routeResp = await this.onelyaService.routePricing(routeReq);
-
-      // ================= BRAND FARE PRICING =================
-const routes: any[] = routeResp?.Routes || [];
-
-for (const providerRoute of routes) {
-  const flights = providerRoute.Segments.flatMap(s => s.Flights);
-  if (!flights.length) continue;
-
-  try {
-    const resp = await this.onelyaService.brandFarePricing({
-      Gds: providerRoute.Gds,
-      AdultQuantity: passengers,
-      ChildQuantity: 0,
-      BabyWithoutPlaceQuantity: 0,
-      BabyWithPlaceQuantity: 0,
-      Flights: flights.map(f => ({
-        MarketingAirlineCode: f.MarketingAirlineCode,
-        OperatingAirlineCode: f.OperatingAirlineCode,
-        FlightNumber: f.FlightNumber,
-        OriginAirportCode: f.OriginAirportCode,
-        DestinationAirportCode: f.DestinationAirportCode,
-        DepartureDateTime: f.DepartureDateTime,
-        ArrivalDateTime: f.ArrivalDateTime,
-        ServiceClass: f.ServiceClass,
-        ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
-        RouteGroup: f.RouteGroup,
-      })),
-    });
-
-    if (Array.isArray(resp?.BrandFares)) {
-  const routeGroup = flights[0]?.RouteGroup ?? 0;
-
-  brandFaresMap.set(
-    `${providerRoute.Id}_${routeGroup}`,
-    resp.BrandFares, // ← ВАЖНО: сохраняем КОМБИНАЦИИ
-  );
-}
-  } catch (e) {
-    this.logger.warn(
-      `[Onelya] BrandFarePricing failed for route ${providerRoute.Id}`,
-    );
-  }
-}
 
       this.logger.debug(
   '[DEBUG][RoutePricing][FIRST ROUTE]',
@@ -233,13 +189,6 @@ const providerRaw = {
     providerRoute,
   });
 
-const routeGroupKey =
-  `${providerRoute.Id}_${providerRoute?.Segments?.[0]?.Flights?.[0]?.RouteGroup ?? 0}`;
-
-if (brandFaresMap.has(routeGroupKey)) {
-  providerRoute.BrandedFares = brandFaresMap.get(routeGroupKey);
-}
-
   return {
     providerRoute,
     routeForFrontend: {
@@ -271,7 +220,7 @@ const cards = enrichedRoutes
 
   private routeToCard(route: any, idx: number) {
    
-   const fares = this.extractPricesAsFares(route);
+   const fares = [];
 
 
     const segments = this.extractSegments(route);
@@ -285,13 +234,14 @@ const cards = enrichedRoutes
     const price =
       route?.Cost ??
       route?.CheapestPrice ??
-      (fares.length > 0 ? fares[0].amount : null);
+      route?.Prices?.[0]?.Amount ??
+      null;
 
     return {
       id: route.__offerId,
       providerRouteId: route.Id,
       offerId: route.__offerId,
-      price: Number.isFinite(Number(price)) ? Number(price) : 0,
+      price: Number.isFinite(Number(price)) ? Number(price) : null,
       currency: route?.Currency || 'RUB',
       fares,
       segments,
@@ -303,59 +253,6 @@ const cards = enrichedRoutes
       stopsCount: Math.max(0, (segments.length - 1)),
     };
   }
-
-
-
-private extractPricesAsFares(route: any) {
-  const fares: any[] = [];
-
-  const firstSegment = route?.Segments?.[0];
-  const firstFlight = firstSegment?.Flights?.[0];
-
-  if (!firstFlight) return fares;
-
-  // 🟢 ВАЖНО: брендированные тарифы
-  const combinations = route?.BrandedFares || [];
-
-if (Array.isArray(combinations) && combinations.length > 0) {
-  combinations.forEach((combo: any, idx: number) => {
-    const price = combo?.Prices?.[0];
-
-    const firstFlight = combo?.BrandFareFlights?.[0];
-    const brandInfo = firstFlight?.BrandedFareInfo;
-
-    fares.push({
-      id: `${route.Id}_${idx}`,
-      title: brandInfo?.BrandName || 'Тариф',
-      amount: price?.Amount ?? combo?.Cost ?? null,
-      currency: route?.Currency || 'RUB',
-
-      baggage: firstFlight?.FareDescription?.BaggageInfo?.Description || null,
-      carryOn: firstFlight?.FareDescription?.CarryOnBaggageInfo?.Description || null,
-      refund: firstFlight?.FareDescription?.RefundInfo?.Description || null,
-      exchange: firstFlight?.FareDescription?.ExchangeInfo?.Description || null,
-      meal: firstFlight?.FareDescription?.MealInfo?.Description || null,
-
-      fareCode: firstFlight?.FareCode,
-      brandId: brandInfo?.GdsBrandId,
-      raw: combo,
-    });
-  });
-
-  return fares;
-}
-
-  // 🔴 fallback — если брендов нет
-  if (route?.Cost) {
-    fares.push({
-      title: 'Эконом',
-      amount: route.Cost,
-      currency: route.Currency || 'RUB',
-    });
-  }
-
-  return fares;
-}
 
   private extractSegments(route: any) {
     if (!Array.isArray(route?.Segments)) return [];
@@ -399,6 +296,105 @@ if (Array.isArray(combinations) && combinations.length > 0) {
    *   serviceClass?: string,
    * }
    */
+
+  async getBrandFares(payload: { offerId: string }) {
+    this.logger.log('=== FLIGHTS BRAND FARES + FARE INFO STARTED ===');
+
+    const offer = flightOfferStore.get(payload.offerId);
+    if (!offer) {
+      throw new Error('Offer not found or expired');
+    }
+
+    const providerRoute = offer.providerRoute;
+    const flights = providerRoute.Segments.flatMap(s => s.Flights);
+
+    /* =========================
+        1️⃣ BrandFarePricing
+    ========================= */
+    const brandResp = await this.onelyaService.brandFarePricing({
+      Gds: providerRoute.Gds,
+      AdultQuantity: 1,
+      ChildQuantity: 0,
+      BabyWithoutPlaceQuantity: 0,
+      BabyWithPlaceQuantity: 0,
+      Flights: flights.map(f => ({
+        MarketingAirlineCode: f.MarketingAirlineCode,
+        OperatingAirlineCode: f.OperatingAirlineCode,
+        FlightNumber: f.FlightNumber,
+        OriginAirportCode: f.OriginAirportCode,
+        DestinationAirportCode: f.DestinationAirportCode,
+        DepartureDateTime: f.DepartureDateTime,
+        ArrivalDateTime: f.ArrivalDateTime,
+        ServiceClass: f.ServiceClass,
+        ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
+        FareCode: f.FareCode,
+        FlightGroup: f.RouteGroup,
+      })),
+    });
+
+    /* =========================
+        2️⃣ FareInfoByRoute
+    ========================= */
+    const fareInfoResp = await this.onelyaService.fareInfoByRoute({
+      Gds: providerRoute.Gds,
+      Flights: flights.map(f => ({
+        MarketingAirlineCode: f.MarketingAirlineCode,
+        OperatingAirlineCode: f.OperatingAirlineCode,
+        FlightNumber: f.FlightNumber,
+        OriginAirportCode: f.OriginAirportCode,
+        DestinationAirportCode: f.DestinationAirportCode,
+        DepartureDateTime: f.DepartureDateTime,
+        ServiceClass: f.ServiceClass,
+        ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
+        FareCode: f.FareCode,
+        FlightGroup: f.RouteGroup,
+      })),
+      FlightIndex: 0,
+      AdultQuantity: 1,
+      ChildQuantity: 0,
+      BabyWithoutPlaceQuantity: 0,
+      BabyWithPlaceQuantity: 0,
+    });
+
+    const rulesText = fareInfoResp?.Text ?? null;
+
+    /* =========================
+        3️⃣ Склейка тарифов
+    ========================= */
+    const brandFares = (brandResp?.BrandFares ?? []).map((bf, idx) => {
+      const flight = bf.BrandFareFlights?.[0];
+
+      return {
+        title: flight?.BrandedFareInfo?.BrandName ?? `Тариф ${idx + 1}`,
+        brandId: flight?.BrandedFareInfo?.GdsBrandId ?? null,
+
+        amount:
+          bf?.Cost ??
+          bf?.Prices?.[0]?.Amount ??
+          null,
+
+        currency: 'RUB',
+
+        baggage: flight?.FareDescription?.BaggageInfo?.Description ?? null,
+        carryOn: flight?.FareDescription?.CarryOnBaggageInfo?.Description ?? null,
+        meal: flight?.FareDescription?.MealInfo?.Description ?? null,
+
+        refund:
+          flight?.FareDescription?.RefundInfo?.Description ??
+          rulesText,
+
+        exchange:
+          flight?.FareDescription?.ExchangeInfo?.Description ??
+          rulesText,
+
+        raw: bf,
+      };
+    });
+
+    offer.brandFares = brandFares;
+    return brandFares;
+  }
+
   async getFareInfo(payload: any) {
     this.logger.log('=== FLIGHTS GET FARE INFO STARTED ===');
     this.logger.debug(`Payload: ${JSON.stringify(payload)}`);
