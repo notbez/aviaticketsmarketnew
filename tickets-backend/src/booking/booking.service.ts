@@ -13,6 +13,7 @@ import {
 } from '../schemas/booking.schema';
 import { OnelyaService } from '../onelya/onelya.service';
 import { flightOfferStore } from '../flights/flight-offer.store';
+import * as crypto from 'crypto';
 
 type ReservationCreateResult = {
   OrderId: number;
@@ -52,6 +53,10 @@ export class BookingService {
     }));
   }
 
+  private generateBlankAccessToken(): string {
+  return crypto.randomBytes(24).toString('hex');
+}
+
 private normalizeContact(contact: any) {
   const phone =
     contact?.phone?.replace(/\D/g, '') || '79990000000';
@@ -87,6 +92,10 @@ private normalizeContact(contact: any) {
     body: any,
   ): Promise<CreateResult> {
     const { offerId, passengers, contact } = body;
+
+    this.logger.log(
+  `[Booking] brandId = ${body.brandId}`,
+);
 
     const passengersCount = {
   Adult: passengers.filter(
@@ -323,32 +332,36 @@ public async confirmOnelya(
   // BLANK
   // ===========================================================================
 
-  public async getBlank(providerBookingId: string) {
-  const orderId = this.parseOrderId(providerBookingId);
+  public async getBlankByBookingId(bookingId: string) {
+  if (!Types.ObjectId.isValid(bookingId)) {
+    throw new BadRequestException('Invalid booking id');
+  }
 
-  const booking = await this.bookingModel.findOne({
-    providerBookingId: String(orderId),
-  });
+  const booking = await this.bookingModel.findById(bookingId);
 
   if (!booking) {
     throw new BadRequestException('Booking not found');
   }
 
-  // Если уже получали — НЕ дергаем Onelya повторно
-  if (booking.rawProviderData?.blank?.fileId) {
-    return {
-      success: true,
-      fileId: booking.rawProviderData.blank.fileId,
-    };
-  }
+  const orderId = this.parseOrderId(booking.providerBookingId);
 
+  // ✅ Если blank уже есть — просто возвращаем
+  if (booking.rawProviderData?.blank?.fileId) {
+  return {
+    success: true,
+    fileId: booking.rawProviderData.blank.fileId,
+    accessToken: booking.rawProviderData.blank.accessToken,
+  };
+}
+
+  // 🔥 Запрашиваем blank у Onelya
   const blank = await this.onelyaService.blankReservation({
     OrderId: orderId,
     RetrieveMainServices: true,
     RetrieveUpsales: true,
   });
 
-  // 🔥 сохраняем файл
+  // 🔥 Сохраняем файл
   const fileId = `blank_${orderId}.pdf`;
   const fs = require('fs');
   const path = require('path');
@@ -363,13 +376,17 @@ public async confirmOnelya(
     fileId,
     contentType: blank.contentType || 'application/pdf',
     receivedAt: new Date(),
+    accessToken: this.generateBlankAccessToken(),
   };
+
+  booking.markModified('rawProviderData');
 
   await booking.save();
 
   return {
     success: true,
     fileId,
+    accessToken: booking.rawProviderData.blank.accessToken,
   };
 }
 

@@ -1,5 +1,5 @@
 // screens/SignUpScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,49 +9,74 @@ import {
   ScrollView,
   Alert,
   Platform,
+  KeyboardAvoidingView,
+  Modal,
+  Animated,
 } from 'react-native';
 import Input from '../components/Input';
 import PrimaryButton from '../components/PrimaryButton';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-import DateTimePickerModal from "react-native-modal-datetime-picker";
-import * as ImagePicker from 'expo-image-picker';
-import { Image } from 'expo-image';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-export default function SignUpScreen({ navigation }) {
+/* ================= CONST (КАК В PassengerInfoScreen) ================= */
+
+const COUNTRIES = [
+  { label: 'Россия', value: 'RU' },
+  { label: 'Узбекистан', value: 'UZ' },
+];
+
+/* ================= HELPERS ================= */
+
+const formatISO = (d) => d.toISOString().split('T')[0];
+
+const formatHuman = (iso) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y}`;
+};
+
+/* ================= SCREEN ================= */
+
+export default function SignUpScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
+  const { returnTo, params } = route.params || {};
 
-  const [fullName, setFullName] = useState('');
+  /* ===== STATE ===== */
+  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [middleName, setMiddleName] = useState('');
+
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [passportNumber, setPassportNumber] = useState('');
-  const [passportCountry, setPassportCountry] = useState('');
-  const [passportExpiryDate, setPassportExpiryDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const [documentNumber, setDocumentNumber] = useState('');
+  const [documentCountry, setDocumentCountry] = useState('');
+  const [documentExpiryDate, setDocumentExpiryDate] = useState('');
+
+  const [picker, setPicker] = useState(null);
+  const [dropdown, setDropdown] = useState(null);
+
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [notificationsAccepted, setNotificationsAccepted] = useState(false);
-  const [avatarUri, setAvatarUri] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const validateEmail = (email) => {
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return re.test(email);
-  };
+  /* ===== VALIDATION ===== */
+  const validateEmail = (email) =>
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const validatePhone = (phone) => {
-    const re = /^[\d\s\-\+\(\)]+$/;
-    return re.test(phone) && phone.replace(/\D/g, '').length >= 10;
-  };
+  const validatePhone = (phone) =>
+    phone.replace(/\D/g, '').length >= 10;
 
+  /* ===== SUBMIT ===== */
   const handleSignUp = async () => {
-    // Validation
-    if (!fullName.trim()) {
-      Alert.alert('Ошибка', 'Введите ФИО');
+    if (!lastName.trim() || !firstName.trim()) {
+      Alert.alert('Ошибка', 'Введите фамилию и имя');
       return;
     }
     if (!validateEmail(email)) {
@@ -75,6 +100,8 @@ export default function SignUpScreen({ navigation }) {
       return;
     }
 
+    const fullName = `${lastName} ${firstName}${middleName ? ' ' + middleName : ''}`;
+
     setLoading(true);
     try {
       const body = {
@@ -82,13 +109,9 @@ export default function SignUpScreen({ navigation }) {
         email: email.trim().toLowerCase(),
         phone,
         password,
-      
-        // паспортные данные — отправляем ТОЛЬКО если есть
-        ...(passportNumber ? { passportNumber } : {}),
-        ...(passportCountry ? { passportCountry } : {}),
-      
-        // ❌ passportExpiryDate НЕ ОТПРАВЛЯЕМ — бэкенд его не принимает
-      
+        ...(documentNumber ? { passportNumber: documentNumber } : {}),
+        ...(documentCountry ? { passportCountry: documentCountry } : {}),
+        ...(documentExpiryDate ? { passportExpiryDate: documentExpiryDate } : {}),
         termsAccepted,
         notificationsAccepted,
       };
@@ -98,295 +121,283 @@ export default function SignUpScreen({ navigation }) {
         body: JSON.stringify(body),
       });
 
-      if (!data.accessToken || !data.user) {
-        throw new Error('Некорректный ответ от сервера');
-      }
-
-      // Save token and user
       await login(data.accessToken, data.user);
-      Alert.alert('Успешно', 'Регистрация завершена');
+
+    if (returnTo) {
+      navigation.replace(returnTo, params);
+    } else {
       navigation.replace('MainTabs');
-    } catch (error) {
-      Alert.alert('Ошибка', error.message || 'Не удалось зарегистрироваться');
-      console.error('SignUp error:', error);
+    }
+    } catch (e) {
+      Alert.alert('Ошибка', e.message || 'Не удалось зарегистрироваться');
     } finally {
       setLoading(false);
     }
   };
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Ошибка', 'Нужен доступ к галерее');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setAvatarUri(result.assets[0].uri);
-    }
-  };
+  /* ================= UI ================= */
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-          <MaterialCommunityIcons name="airplane" size={36} color="#000" />
-        </View>
-
-        <Text style={styles.title}>Регистрация</Text>
-        <Text style={styles.sub}>Заполните данные для создания аккаунта</Text>
-
-        {/* Avatar */}
-        <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <MaterialCommunityIcons name="camera" size={32} color="#999" />
+        <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+          {/* HEADER */}
+          <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+            <View style={styles.logo}>
+              <MaterialCommunityIcons name="airplane" size={28} color="#0277bd" />
             </View>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.form}>
-          <Input
-            label="ФИО"
-            placeholder="Введите ваше полное имя"
-            value={fullName}
-            onChangeText={setFullName}
-          />
-
-          <Input
-            label="Email"
-            placeholder="Введите email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <Input
-            label="Телефон"
-            placeholder="+7 (999) 123-45-67"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-          />
-
-          <Input
-            label="Пароль"
-            placeholder="Минимум 6 символов"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-
-          <Input
-            label="Подтвердите пароль"
-            placeholder="Повторите пароль"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
-
-          <Text style={styles.sectionTitle}>Паспортные данные</Text>
-
-          <Input
-            label="Номер паспорта"
-            placeholder="Серия и номер"
-            value={passportNumber}
-            onChangeText={setPassportNumber}
-          />
-
-          <Input
-            label="Страна выдачи"
-            placeholder="Россия"
-            value={passportCountry}
-            onChangeText={setPassportCountry}
-          />
-
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.dateLabel}>Срок действия паспорта</Text>
-            <Text style={styles.dateValue}>
-              {passportExpiryDate.toLocaleDateString('ru-RU')}
-            </Text>
-          </TouchableOpacity>
-
-          <DateTimePickerModal
-  isVisible={showDatePicker}
-  mode="date"
-  minimumDate={new Date()}
-  onConfirm={(date) => {
-    setPassportExpiryDate(date);
-    setShowDatePicker(false);
-  }}
-  onCancel={() => setShowDatePicker(false)}
-/>
-
-          <View style={styles.checkboxContainer}>
-            <TouchableOpacity
-              style={styles.checkbox}
-              onPress={() => setTermsAccepted(!termsAccepted)}
-            >
-              <View style={[styles.checkboxBox, termsAccepted && styles.checkboxBoxChecked]}>
-                {termsAccepted && (
-                  <MaterialCommunityIcons name="check" size={16} color="#fff" />
-                )}
-              </View>
-              <Text style={styles.checkboxText}>
-                Принимаю пользовательское соглашение
-              </Text>
-            </TouchableOpacity>
+            <Text style={styles.title}>Регистрация</Text>
+            <Text style={styles.sub}>Создайте аккаунт для бронирования рейсов</Text>
           </View>
 
-          <View style={styles.checkboxContainer}>
-            <TouchableOpacity
-              style={styles.checkbox}
-              onPress={() => setNotificationsAccepted(!notificationsAccepted)}
-            >
-              <View
-                style={[
-                  styles.checkboxBox,
-                  notificationsAccepted && styles.checkboxBoxChecked,
-                ]}
-              >
-                {notificationsAccepted && (
-                  <MaterialCommunityIcons name="check" size={16} color="#fff" />
-                )}
-              </View>
-              <Text style={styles.checkboxText}>
-                Согласен получать уведомления
-              </Text>
+          <View style={styles.card}>
+            <Input label="Фамилия" placeholder="Иванов" value={lastName} onChangeText={setLastName} />
+            <Input label="Имя" placeholder="Иван" value={firstName} onChangeText={setFirstName} />
+            <Input label="Отчество (необязательно)" placeholder="Иванович" value={middleName} onChangeText={setMiddleName} />
+
+            <Input label="Email" placeholder="example@mail.com" value={email} onChangeText={setEmail} />
+            <Input label="Телефон" placeholder="+7 900 000-00-00" value={phone} onChangeText={setPhone} />
+
+            <Input label="Пароль" placeholder="Минимум 6 символов" secureTextEntry value={password} onChangeText={setPassword} />
+            <Input label="Подтвердите пароль" placeholder="Повторите пароль" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
+
+            <Text style={styles.section}>Данные документа</Text>
+
+            <Input
+              label="Номер документа"
+              placeholder="1234567890"
+              keyboardType="numeric"
+              value={documentNumber}
+              onChangeText={(t) => setDocumentNumber(t.replace(/\D/g, '').slice(0, 10))}
+            />
+
+            <Select
+              label="Страна выдачи"
+              value={COUNTRIES.find(c => c.value === documentCountry)?.label}
+              onPress={(y) =>
+                setDropdown({ y, field: 'country', options: COUNTRIES })
+              }
+            />
+
+            <Select
+              label="Срок действия документа"
+              value={formatHuman(documentExpiryDate)}
+              onPress={() =>
+                setPicker({ field: 'expiry', value: documentExpiryDate })
+              }
+            />
+
+            <TouchableOpacity style={styles.checkbox} onPress={() => setTermsAccepted(!termsAccepted)}>
+              <View style={[styles.checkboxBox, termsAccepted && styles.checkboxChecked]} />
+              <Text style={styles.checkboxText}>Принимаю пользовательское соглашение</Text>
             </TouchableOpacity>
+
+            <PrimaryButton title="Зарегистрироваться" onPress={handleSignUp} disabled={loading} />
           </View>
+        </ScrollView>
 
-          <PrimaryButton
-            title="Зарегистрироваться"
-            onPress={handleSignUp}
-            disabled={loading}
+        {/* DATE PICKER */}
+        {picker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={picker.value ? new Date(picker.value) : new Date()}
+            mode="date"
+            display="default"
+            locale="ru-RU"
+            onChange={(e, d) => {
+              setPicker(null);
+              if (e.type === 'set' && d) {
+                setDocumentExpiryDate(formatISO(d));
+              }
+            }}
           />
-        </View>
+        )}
 
-        <TouchableOpacity
-          style={styles.link}
-          onPress={() => navigation.navigate('Login')}
-        >
-          <Text style={styles.linkText}>
-            Уже есть аккаунт? <Text style={{ color: '#29A9E0' }}>Войти</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+        {picker && Platform.OS === 'ios' && (
+          <Modal transparent animationType="fade">
+            <View style={styles.modal}>
+              <View style={styles.modalCard}>
+                <DateTimePicker
+                  value={picker.value ? new Date(picker.value) : new Date()}
+                  mode="date"
+                  display="spinner"
+                  locale="ru-RU"
+                  themeVariant="light"
+                  textColor="#000"
+                  style={{ height: 216 }}
+                  onChange={(e, d) => {
+                    if (d) setDocumentExpiryDate(formatISO(d));
+                  }}
+                />
+                <TouchableOpacity style={styles.modalBtn} onPress={() => setPicker(null)}>
+                  <Text style={styles.modalText}>Готово</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        )}
+
+        {dropdown && (
+          <Dropdown
+            {...dropdown}
+            onClose={() => setDropdown(null)}
+            onSelect={(v) => {
+              setDocumentCountry(v);
+              setDropdown(null);
+            }}
+          />
+        )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+/* ================= SELECT + DROPDOWN (ОДИН В ОДИН) ================= */
+
+const Select = ({ label, value, onPress }) => {
+  const ref = useRef(null);
+
+  return (
+    <>
+      <Text style={styles.fakeLabel}>{label}</Text>
+      <TouchableOpacity
+        ref={ref}
+        style={styles.fakeInput}
+        onPress={() => {
+          ref.current?.measureInWindow((x, y, w, h) => {
+            onPress(y + h);
+          });
+        }}
+      >
+        <View style={styles.selectRow}>
+          <Text style={[styles.fakeValue, !value && { color: '#999' }]}>
+            {value || 'Выберите'}
+          </Text>
+          <MaterialIcons name="keyboard-arrow-down" size={22} color="#666" />
+        </View>
+      </TouchableOpacity>
+    </>
+  );
+};
+
+const Dropdown = ({ y, options, onSelect, onClose }) => {
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  const close = () => {
+    Animated.timing(anim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+    }).start(onClose);
+  };
+
+  return (
+    <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={close}>
+      <Animated.View
+        style={[
+          styles.dropdown,
+          {
+            top: y + 6,
+            opacity: anim,
+            transform: [
+              {
+                translateY: anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-6, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        {options.map((o) => (
+          <TouchableOpacity key={o.value} style={styles.dropdownItem} onPress={() => onSelect(o.value)}>
+            <Text style={styles.dropdownText}>{o.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
+
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 20, alignItems: 'center', paddingBottom: 40 },
-  header: { alignItems: 'center' },
-  title: {
-    fontSize: 22,
-    fontFamily: 'Roboto_700Bold',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  sub: {
-    color: '#9A9A9A',
-    marginTop: 8,
-    textAlign: 'center',
-    fontFamily: 'Roboto_400Regular',
-    marginBottom: 20,
-  },
-  avatarContainer: {
-    marginBottom: 20,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#f0f0f0',
+  container: { padding: 20, paddingBottom: 40 },
+  header: { alignItems: 'center', marginBottom: 20 },
+  logo: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#e3f2fd',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderStyle: 'dashed',
+    marginBottom: 12,
   },
-  form: {
-    width: '100%',
-    marginTop: 10,
+  title: { fontSize: 22, fontWeight: '800', color: '#111' },
+  sub: { fontSize: 14, color: '#777', marginTop: 6 },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Roboto_700Bold',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#333',
-  },
-  dateButton: {
+  section: { fontSize: 15, fontWeight: '700', marginTop: 12, marginBottom: 6 },
+
+  checkbox: { flexDirection: 'row', alignItems: 'center', marginVertical: 14 },
+  checkboxBox: { width: 20, height: 20, borderWidth: 2, borderColor: '#0277bd', marginRight: 10 },
+  checkboxChecked: { backgroundColor: '#0277bd' },
+  checkboxText: { fontSize: 14 },
+
+  fakeLabel: { fontSize: 12, color: '#777', marginBottom: 4 },
+  fakeInput: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 14,
     marginBottom: 12,
+  },
+  fakeValue: { fontSize: 15, color: '#111' },
+  selectRow: { flexDirection: 'row', justifyContent: 'space-between' },
+
+  overlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
+  dropdown: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
     backgroundColor: '#fff',
+    borderRadius: 18,
+    elevation: 8,
   },
-  dateLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-    fontFamily: 'Roboto_400Regular',
-  },
-  dateValue: {
-    fontSize: 16,
-    color: '#111',
-    fontFamily: 'Roboto_400Regular',
-  },
-  checkboxContainer: {
-    marginVertical: 8,
-  },
-  checkbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkboxBox: {
-    width: 20,
-    height: 20,
-    borderWidth: 2,
-    borderColor: '#29A9E0',
-    borderRadius: 4,
-    marginRight: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  checkboxBoxChecked: {
-    backgroundColor: '#29A9E0',
-  },
-  checkboxText: {
+  dropdownItem: { padding: 16 },
+  dropdownText: { fontSize: 15 },
+
+  modal: {
     flex: 1,
-    fontSize: 14,
-    color: '#333',
-    fontFamily: 'Roboto_400Regular',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  link: { marginTop: 12 },
-  linkText: { color: '#777', fontFamily: 'Roboto_400Regular' },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 16,
+    width: '85%',
+  },
+  modalBtn: { marginTop: 12, alignItems: 'center' },
+  modalText: { color: '#0277bd', fontSize: 16, fontWeight: '700' },
 });

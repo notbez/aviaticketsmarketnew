@@ -1,10 +1,27 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function SplashScreen() {
+  const navigation = useNavigation();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      navigation.replace('MainTabs');
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.airplane}>✈️</Text>
+      <MaterialCommunityIcons
+        name="airplane"
+        size={64}
+        color="#FFFFFF"
+        style={styles.icon}
+      />
       <Text style={styles.title}>Aviamarket</Text>
     </View>
   );
@@ -17,14 +34,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  airplane: {
-    fontSize: 60,
-    color: '#fff',
+  icon: {
+    marginBottom: 12,
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#fff',
-    marginTop: 16,
+    color: '#FFFFFF',
   },
 });

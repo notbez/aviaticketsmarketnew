@@ -16,114 +16,173 @@ export default function SupportOptionsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Поддержка</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.subtitle}>
-          Выберите, как вы хотите получить помощь
-        </Text>
-
-        <TouchableOpacity
-          style={styles.optionCard}
-          onPress={() => navigation.navigate('Faq')}
-        >
-          <View style={styles.optionIcon}>
-            <MaterialCommunityIcons
-              name="help-circle-outline"
-              size={32}
-              color="#0277bd"
-            />
-          </View>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>Часто задаваемые вопросы</Text>
-            <Text style={styles.optionDescription}>
-              Найдите ответы на популярные вопросы
-            </Text>
-          </View>
-          <MaterialIcons
-            name="keyboard-arrow-right"
-            size={24}
-            color="#bdbdbd"
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 32 + insets.bottom },
+        ]}
+      >
+        {/* INTRO */}
+        <View style={styles.intro}>
+          <MaterialCommunityIcons
+            name="lifebuoy"
+            size={42}
+            color="#0277bd"
           />
-        </TouchableOpacity>
+          <Text style={styles.subtitle}>
+            Выберите удобный способ получить помощь
+          </Text>
+        </View>
 
-        <TouchableOpacity
-          style={styles.optionCard}
-          onPress={() => navigation.navigate('Support')}
-        >
-          <View style={styles.optionIcon}>
-            <MaterialIcons name="support-agent" size={32} color="#0277bd" />
-          </View>
-          <View style={styles.optionContent}>
-            <Text style={styles.optionTitle}>Написать в поддержку</Text>
-            <Text style={styles.optionDescription}>
-              Свяжитесь с нашей службой поддержки
-            </Text>
-          </View>
-          <MaterialIcons
-            name="keyboard-arrow-right"
-            size={24}
-            color="#bdbdbd"
+        {/* OPTIONS */}
+        <View style={styles.card}>
+          <SupportItem
+            icon={
+              <MaterialCommunityIcons
+                name="help-circle-outline"
+                size={26}
+                color="#0277bd"
+              />
+            }
+            title="Часто задаваемые вопросы"
+            description="Ответы на популярные вопросы"
+            onPress={() => navigation.navigate('Faq')}
           />
-        </TouchableOpacity>
+
+          <View style={styles.divider} />
+
+          <SupportItem
+            icon={
+              <MaterialIcons
+                name="support-agent"
+                size={26}
+                color="#0277bd"
+              />
+            }
+            title="Написать в поддержку"
+            description="Связаться со службой поддержки"
+            onPress={() => navigation.navigate('Support')}
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+/* ===== UI COMPONENT ===== */
+
+const SupportItem = ({ icon, title, description, onPress }) => (
+  <TouchableOpacity style={styles.item} onPress={onPress}>
+    <View style={styles.itemIcon}>{icon}</View>
+
+    <View style={styles.itemContent}>
+      <Text style={styles.itemTitle}>{title}</Text>
+      <Text style={styles.itemDescription}>{description}</Text>
+    </View>
+
+    <MaterialIcons
+      name="keyboard-arrow-right"
+      size={24}
+      color="#bdbdbd"
+    />
+  </TouchableOpacity>
+);
+
+/* ===== STYLES ===== */
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#fff' },
+  safe: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+
   header: {
-    paddingHorizontal: 16,
-    marginBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  headerTitle: { fontSize: 20, fontWeight: '700', color: '#111', flex: 1, marginLeft: 12 },
-  container: { padding: 16, paddingBottom: 40 },
+
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111',
+  },
+
+  content: {
+    padding: 16,
+  },
+
+  intro: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+
   subtitle: {
+    marginTop: 10,
     fontSize: 14,
     color: '#666',
-    marginBottom: 24,
     textAlign: 'center',
   },
-  optionCard: {
+
+  card: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 16,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+
+  item: {
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
   },
-  optionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
+
+  itemIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: '#e3f2fd',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
-  optionContent: { flex: 1 },
-  optionTitle: {
-    fontSize: 16,
+
+  itemContent: {
+    flex: 1,
+  },
+
+  itemTitle: {
+    fontSize: 15,
     fontWeight: '700',
     color: '#111',
     marginBottom: 4,
   },
-  optionDescription: {
+
+  itemDescription: {
     fontSize: 13,
-    color: '#666',
+    color: '#777',
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginLeft: 74,
   },
 });
-

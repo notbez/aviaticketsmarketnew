@@ -102,41 +102,50 @@ export class AuthService {
     };
   }
 
-  async login(loginDto: LoginDto) {
-    const user = await this.userModel
-      .findOne({ email: loginDto.email.toLowerCase() })
-      .select('+passwordHash');
+async login(loginDto: LoginDto) {
+  const { email, phone, password } = loginDto;
 
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    const isPasswordValid = await bcrypt.compare(
-      loginDto.password,
-      user.passwordHash,
-    );
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Account is deactivated');
-    }
-
-    const payload = { sub: user._id.toString(), email: user.email };
-    const accessToken = this.jwtService.sign(payload);
-
-    const userObj = user.toObject();
-    delete userObj.passwordHash;
-    delete userObj.avatar;
-
-    return {
-      accessToken,
-      user: userObj,
-    };
+  if (!email && !phone) {
+    throw new UnauthorizedException('Email or phone required');
   }
 
+  const query = email
+    ? { email: email.toLowerCase() }
+    : { phone };
+
+  const user = await this.userModel
+    .findOne(query)
+    .select('+passwordHash');
+
+  if (!user || !user.passwordHash) {
+    throw new UnauthorizedException('Invalid credentials');
+  }
+
+  const isPasswordValid = await bcrypt.compare(
+    password,
+    user.passwordHash,
+  );
+
+  if (!isPasswordValid) {
+    throw new UnauthorizedException('Invalid credentials');
+  }
+
+  if (!user.isActive) {
+    throw new UnauthorizedException('Account is deactivated');
+  }
+
+  const payload = { sub: user._id.toString(), email: user.email };
+  const accessToken = this.jwtService.sign(payload);
+
+  const userObj = user.toObject();
+  delete userObj.passwordHash;
+  delete userObj.avatar;
+
+  return {
+    accessToken,
+    user: userObj,
+  };
+}
   /**
  * Генерация JWT для произвольного пользователя
  * @param user - объект пользователя (достаточно иметь _id и email)

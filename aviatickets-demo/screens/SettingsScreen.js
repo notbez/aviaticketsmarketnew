@@ -8,52 +8,60 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function SettingsScreen({ navigation }) {
-  const Row = ({ icon, title, onPress }) => (
-    <TouchableOpacity style={styles.row} onPress={onPress}>
-      <View style={styles.iconCircle}>
-        <Text style={styles.iconLetter}>{icon}</Text>
+  const insets = useSafeAreaInsets();
+
+  const Card = ({ icon, title, onPress }) => (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      style={styles.card}
+      onPress={onPress}
+    >
+      <View style={styles.row}>
+        <View style={styles.iconWrap}>
+          <MaterialIcons name={icon} size={22} color="#0277bd" />
+        </View>
+
+        <Text style={styles.title}>{title}</Text>
+
+        <MaterialIcons name="chevron-right" size={24} color="#b0b0b0" />
       </View>
-      <Text style={styles.rowTitle}>{title}</Text>
-      <Text style={styles.chev}>›</Text>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.back}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Настройки</Text>
-        </View>
+      {/* HEADER */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={24} />
+        </TouchableOpacity>
 
-        <View style={{ height: 12 }} />
+        <Text style={styles.headerTitle}>Настройки</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
-        <Row
-          icon="🔔"
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: 40 + insets.bottom },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card
+          icon="notifications-none"
           title="Уведомления"
           onPress={() => navigation.navigate('Notifications')}
         />
-        <Row
-          icon="🌍"
-          title="Регион"
-          onPress={() => navigation.navigate('Region')}
-        />
-        <Row
-          icon="💱"
-          title="Валюта"
-          onPress={() => navigation.navigate('Currency')}
-        />
-        <Row
-          icon="⚖️"
+
+        <Card
+          icon="gavel"
           title="Правовая информация"
           onPress={() => navigation.navigate('Legal')}
         />
-
-        <View style={{ height: 200 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -61,47 +69,41 @@ export default function SettingsScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
-  container: { padding: 16 },
-
   header: {
-    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  back: { fontSize: 28, color: '#222', paddingHorizontal: 8 },
-  title: { fontSize: 20, fontWeight: '700', flex: 1 },
-
-  row: {
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111',
+  },
+  content: { padding: 16 },
+  card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    // subtle shadow
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 14,
     shadowColor: '#000',
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-
-  iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: '#e8f7ff',
+  row: { flexDirection: 'row', alignItems: 'center' },
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#e8f4ff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 14,
   },
-
-  iconLetter: { fontSize: 18 },
-
-  rowTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  chev: { fontSize: 20, color: '#999' },
+  title: { flex: 1, fontSize: 16, fontWeight: '600', color: '#111' },
 });

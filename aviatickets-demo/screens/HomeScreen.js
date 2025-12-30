@@ -11,13 +11,15 @@ import {
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import LoadingOverlay from '../components/LoadingOverlay';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Dimensions } from "react-native";
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api'; // <- используем твой api wrapper
+import CityPickerSheet from '../components/CityPickerSheet';
+import { CITIES } from '../data/cities';
+import DateWheelSheet from '../components/DateWheelSheet';
 
 export default function HomeScreen() {
   const nav = useNavigation();
@@ -30,7 +32,6 @@ export default function HomeScreen() {
 
   const [departureDate, setDepartureDate] = useState(new Date());
   const [returnDate, setReturnDate] = useState(null);
-  const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState('departure'); // 'departure' | 'return'
 
   const [passengers, setPassengers] = useState('1');
@@ -39,6 +40,10 @@ export default function HomeScreen() {
   const [cls, setCls] = useState('Эконом');
   const [showClass, setShowClass] = useState(false);
   const [isRoundTrip, setIsRoundTrip] = useState(false);
+
+  const [cityTarget, setCityTarget] = useState(null); // 'from' | 'to'
+  const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [showDateSheet, setShowDateSheet] = useState(false);
 
   // тарифы — значения Onelya (ключ) -> русская метка (value)
   const TARIFFS = [
@@ -68,6 +73,16 @@ export default function HomeScreen() {
       .toString()
       .padStart(2, '0')}.${d.getFullYear()}`;
 
+      const formatDateForApi = (date) => {
+  if (!date) return null;
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
   const openBottomSheet = (content) => {
     setBottomSheetContent(content);
     bottomSheetRef.current?.expand?.();
@@ -93,8 +108,8 @@ export default function HomeScreen() {
         origin: fromCode,
         destination: toCode,
         // отправляем ISO — backend должен привести в требуемый формат с московским временем
-        departureDate: departureDate ? departureDate.toISOString() : null,
-        returnDate: isRoundTrip && returnDate ? returnDate.toISOString() : null,
+        departureDate: formatDateForApi(departureDate),
+        returnDate: isRoundTrip ? formatDateForApi(returnDate) : null,
         passengers: Number(passengers) || 1,
         // ServiceClass: 'Economic' или 'Business' (строго как в документации)
         serviceClass: cls === 'Эконом' ? 'Economic' : 'Business',
@@ -226,19 +241,14 @@ export default function HomeScreen() {
           {/* FIELDS */}
           <View style={{ position: 'relative', marginBottom: 18 }}>
             <Field
-              label="Откуда"
-              icon="airplane-takeoff"
-              value={fromName}
-              onPress={() =>
-                nav.navigate('SelectCity', {
-                  target: 'from',
-                  onSelect: (code, name) => {
-                    setFromCode(code);
-                    setFromName(name);
-                  },
-                })
-              }
-            />
+                label="Откуда"
+                icon="airplane-takeoff"
+                value={fromName}
+                onPress={() => {
+                  setCityTarget('from');
+                  setCityPickerVisible(true);
+                }}
+              />
 
             {/* SWAP BUTTON */}
             <View
@@ -276,27 +286,22 @@ export default function HomeScreen() {
               label="Куда"
               icon="airplane-landing"
               value={toName}
-              onPress={() =>
-                nav.navigate('SelectCity', {
-                  target: 'to',
-                  onSelect: (code, name) => {
-                    setToCode(code);
-                    setToName(name);
-                  },
-                })
-              }
+              onPress={() => {
+                setCityTarget('to');
+                setCityPickerVisible(true);
+              }}
             />
           </View>
 
           <Field
-            label="Дата вылета"
-            icon="calendar"
-            value={formatDateForUI(departureDate)}
-            onPress={() => {
-              setPickerMode('departure');
-              setShowPicker(true);
-            }}
-          />
+  label="Дата вылета"
+  icon="calendar"
+  value={formatDateForUI(departureDate)}
+  onPress={() => {
+    setPickerMode('departure');
+    setShowDateSheet(true);
+  }}
+/>
 
           {/* Return date (если roundtrip) */}
           {isRoundTrip && (
@@ -305,9 +310,9 @@ export default function HomeScreen() {
               icon="calendar-range"
               value={returnDate ? formatDateForUI(returnDate) : 'Выберите дату'}
               onPress={() => {
-                setPickerMode('return');
-                setShowPicker(true);
-              }}
+  setPickerMode('return');
+  setShowDateSheet(true);
+}}
             />
           )}
 
@@ -397,26 +402,42 @@ export default function HomeScreen() {
       </ScrollView>
 
       {/* DATE PICKER */}
-      {showPicker && (
-        <DateTimePicker
-          value={pickerMode === 'departure' ? departureDate : (returnDate || new Date())}
-          mode="date"
-          display="default"
-          onChange={(e, selected) => {
-            setShowPicker(false);
-            if (!selected) return;
-            if (pickerMode === 'departure') {
-              setDepartureDate(selected);
-              // если был ранее returnDate раньше чем новая departureDate — сбросим returnDate
-              if (returnDate && selected > returnDate) setReturnDate(null);
-            } else {
-              setReturnDate(selected);
-            }
-          }}
-        />
-      )}
+      
 
       {loading && <LoadingOverlay />}
+
+      <CityPickerSheet
+  visible={cityPickerVisible}
+  cities={CITIES}
+  onClose={() => setCityPickerVisible(false)}
+  onSelect={(city) => {
+    if (cityTarget === 'from') {
+      setFromCode(city.code);
+      setFromName(city.name);
+    } else {
+      setToCode(city.code);
+      setToName(city.name);
+    }
+  }}
+/>
+
+<DateWheelSheet
+  visible={showDateSheet}
+  initialDate={
+    pickerMode === 'departure'
+      ? departureDate
+      : returnDate || departureDate
+  }
+  onClose={() => setShowDateSheet(false)}
+  onConfirm={(date) => {
+    if (pickerMode === 'departure') {
+      setDepartureDate(date);
+      if (returnDate && date > returnDate) setReturnDate(null);
+    } else {
+      setReturnDate(date);
+    }
+  }}
+/>
     </SafeAreaView>
   );
 }
@@ -430,12 +451,6 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
-  },
-
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#fff',
   },
 
   card: {

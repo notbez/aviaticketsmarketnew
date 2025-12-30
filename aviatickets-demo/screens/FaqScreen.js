@@ -1,5 +1,5 @@
 // screens/FaqScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,182 +8,162 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 
 const categories = [
-  { id: 'all', name: 'Все', icon: 'format-list-bulleted' },
-  { id: 'payments', name: 'Оплата', icon: 'credit-card' },
-  { id: 'baggage', name: 'Багаж', icon: 'luggage' },
-  { id: 'refunds', name: 'Возвраты', icon: 'undo' },
-  { id: 'checkin', name: 'Регистрация', icon: 'airplane-takeoff' },
-  { id: 'general', name: 'Общее', icon: 'help-circle' },
+  { id: 'all', name: 'Все' },
+  { id: 'payments', name: 'Оплата' },
+  { id: 'baggage', name: 'Багаж' },
+  { id: 'refunds', name: 'Возвраты' },
+  { id: 'checkin', name: 'Регистрация' },
+  { id: 'general', name: 'Общее' },
 ];
 
 export default function FaqScreen({ navigation }) {
   const insets = useSafeAreaInsets();
+
   const [faqs, setFaqs] = useState([]);
-  const [filteredFaqs, setFilteredFaqs] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
+  /* ===== LOAD FAQ ONCE ===== */
   useEffect(() => {
     loadFaqs();
   }, []);
 
-  useEffect(() => {
-    filterFaqs();
-  }, [faqs, selectedCategory, searchQuery]);
-
   const loadFaqs = async () => {
     try {
       setLoading(true);
-      const categoryParam = selectedCategory !== 'all' ? `?category=${selectedCategory}` : '';
-      const data = await api(`/faq${categoryParam}`);
-      const faqsArray = Array.isArray(data) ? data : [];
-      setFaqs(faqsArray);
-    } catch (error) {
-      console.error('Error loading FAQ:', error);
-      setFaqs([]); // Устанавливаем пустой массив при ошибке
+      const data = await api('/faq');
+      setFaqs(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setFaqs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterFaqs = () => {
-    // Убеждаемся, что faqs - это массив
-    let filtered = Array.isArray(faqs) ? [...faqs] : [];
+  /* ===== FILTER ===== */
+  const filteredFaqs = useMemo(() => {
+    let result = [...faqs];
 
-    // Filter by category
     if (selectedCategory !== 'all') {
-      filtered = filtered.filter((faq) => faq.category === selectedCategory);
+      result = result.filter((f) => f.category === selectedCategory);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (faq) =>
-          faq.question?.toLowerCase().includes(query) ||
-          faq.answer?.toLowerCase().includes(query)
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (f) =>
+          f.question?.toLowerCase().includes(q) ||
+          f.answer?.toLowerCase().includes(q)
       );
     }
 
-    setFilteredFaqs(filtered);
-  };
+    return result;
+  }, [faqs, selectedCategory, searchQuery]);
 
   const toggleItem = (id) => {
-    const newExpanded = new Set(expandedItems);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedItems(newExpanded);
-  };
-
-  const handleCategoryChange = (categoryId) => {
-    setSelectedCategory(categoryId);
-    loadFaqs();
+    const next = new Set(expandedItems);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setExpandedItems(next);
   };
 
   return (
     <SafeAreaView style={styles.safe}>
+      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <MaterialCommunityIcons name="arrow-left" size={24} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Часто задаваемые вопросы</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <MaterialCommunityIcons
-          name="magnify"
-          size={20}
-          color="#999"
-          style={styles.searchIcon}
-        />
+      {/* SEARCH */}
+      <View style={styles.search}>
+        <MaterialCommunityIcons name="magnify" size={20} color="#999" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Поиск по вопросам..."
+          placeholder="Поиск по вопросам"
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#999"
         />
-        {searchQuery.length > 0 && (
+        {!!searchQuery && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <MaterialCommunityIcons name="close-circle" size={20} color="#999" />
+            <MaterialCommunityIcons name="close-circle" size={18} color="#999" />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Categories */}
-      <View style={styles.categoriesContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesScrollContent}
-        >
-          {categories.map((cat) => (
+      {/* CATEGORIES (НЕ ЛОМАЕМ ПОЛОЧКУ) */}
+      <View style={styles.tabs}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {categories.map((c) => (
             <TouchableOpacity
-              key={cat.id}
+              key={c.id}
+              onPress={() => setSelectedCategory(c.id)}
               style={[
-                styles.categoryTab,
-                selectedCategory === cat.id && styles.categoryTabActive,
+                styles.tab,
+                selectedCategory === c.id && styles.tabActive,
               ]}
-              onPress={() => handleCategoryChange(cat.id)}
             >
               <Text
                 style={[
-                  styles.categoryText,
-                  selectedCategory === cat.id && styles.categoryTextActive,
+                  styles.tabText,
+                  selectedCategory === c.id && styles.tabTextActive,
                 ]}
               >
-                {cat.name}
+                {c.name}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      {/* FAQ List */}
-      <ScrollView style={styles.faqList} showsVerticalScrollIndicator={false}>
+      {/* LIST */}
+      <ScrollView style={styles.list}>
         {loading ? (
           <View style={styles.center}>
-            <Text style={styles.loadingText}>Загрузка...</Text>
+            <ActivityIndicator size="large" color="#0277bd" />
           </View>
-        ) : !Array.isArray(filteredFaqs) || filteredFaqs.length === 0 ? (
+        ) : filteredFaqs.length === 0 ? (
           <View style={styles.center}>
-            <MaterialCommunityIcons name="help-circle-outline" size={64} color="#ccc" />
-            <Text style={styles.emptyText}>Вопросы не найдены</Text>
+            <MaterialCommunityIcons
+              name="help-circle-outline"
+              size={56}
+              color="#ccc"
+            />
+            <Text style={styles.empty}>Вопросы не найдены</Text>
           </View>
         ) : (
           filteredFaqs.map((faq) => {
-            const isExpanded = expandedItems.has(faq._id || faq.id);
+            const id = faq._id || faq.id;
+            const open = expandedItems.has(id);
+
             return (
-              <View key={faq._id || faq.id} style={styles.faqItem}>
+              <View key={id} style={styles.card}>
                 <TouchableOpacity
-                  style={styles.faqQuestion}
-                  onPress={() => toggleItem(faq._id || faq.id)}
+                  style={styles.question}
+                  onPress={() => toggleItem(id)}
                 >
-                  <Text style={styles.faqQuestionText}>{faq.question}</Text>
+                  <Text style={styles.questionText}>{faq.question}</Text>
                   <MaterialCommunityIcons
-                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={24}
-                    color="#666"
+                    name={open ? 'chevron-up' : 'chevron-down'}
+                    size={22}
+                    color="#777"
                   />
                 </TouchableOpacity>
-                {isExpanded && (
-                  <View style={styles.faqAnswer}>
-                    <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+
+                {open && (
+                  <View style={styles.answer}>
+                    <Text style={styles.answerText}>{faq.answer}</Text>
                   </View>
                 )}
               </View>
@@ -195,131 +175,117 @@ export default function FaqScreen({ navigation }) {
   );
 }
 
+/* ===== STYLES ===== */
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
+
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  backButton: {
-    marginRight: 12,
-  },
+
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
     flex: 1,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '800',
   },
-  searchContainer: {
+
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 12,
+    margin: 16,
     paddingHorizontal: 12,
     paddingVertical: 10,
+    borderRadius: 14,
     backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    gap: 8,
   },
-  searchIcon: {
-    marginRight: 8,
-  },
+
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    fontFamily: 'Roboto_400Regular',
-    color: '#111',
+    fontSize: 15,
   },
-  categoriesContainer: {
+
+  tabs: {
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
-  categoriesScrollContent: {
-    paddingVertical: 0,
-  },
-  categoryTab: {
+
+  tab: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    marginRight: 8,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  categoryTabActive: {
+
+  tabActive: {
     borderBottomColor: '#0277bd',
   },
-  categoryText: {
-    fontSize: 14,
+
+  tabText: {
     color: '#999',
     fontWeight: '500',
   },
-  categoryTextActive: {
+
+  tabTextActive: {
     color: '#0277bd',
     fontWeight: '700',
   },
-  faqList: {
-    flex: 1,
-    paddingHorizontal: 20,
+
+  list: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
-  faqItem: {
-    marginBottom: 12,
-    borderRadius: 12,
+
+  card: {
     backgroundColor: '#fff',
-    overflow: 'hidden',
+    borderRadius: 14,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  faqQuestion: {
+
+  question: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 16,
-    minHeight: 60,
+    padding: 16,
   },
-  faqQuestionText: {
+
+  questionText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#111',
-    marginRight: 12,
-    lineHeight: 22,
+    marginRight: 10,
   },
-  faqAnswer: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+
+  answer: {
     borderTopWidth: 1,
     borderTopColor: '#eee',
+    padding: 16,
   },
-  faqAnswerText: {
+
+  answerText: {
     fontSize: 14,
-    fontFamily: 'Roboto_400Regular',
-    color: '#666',
+    color: '#555',
     lineHeight: 20,
-    marginTop: 12,
   },
+
   center: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 60,
   },
-  loadingText: {
-    fontSize: 16,
+
+  empty: {
+    marginTop: 12,
     color: '#999',
-    fontFamily: 'Roboto_400Regular',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#999',
-    fontFamily: 'Roboto_400Regular',
-    marginTop: 16,
   },
 });
-

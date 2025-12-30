@@ -45,13 +45,34 @@ try {
     throw new Error(`Network error: ${e.message}`);
   }
 
-  const text = await res.text().catch(() => null);
-  let data;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
+// 👉 БИНАРНЫЕ ОТВЕТЫ (PDF, files)
+if (options.responseType === 'arraybuffer') {
+  if (!res.ok) {
+    const text = await res.text().catch(() => null);
+    let data;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = text;
+    }
+    const msg =
+      data?.message ||
+      data?.error ||
+      `Request failed: ${res.status}`;
+    throw new Error(msg);
   }
+
+  return await res.arrayBuffer();
+}
+
+// 👉 JSON / TEXT (как было)
+const text = await res.text().catch(() => null);
+let data;
+try {
+  data = text ? JSON.parse(text) : null;
+} catch {
+  data = text;
+}
 
   if (!res.ok) {
     // Если Unauthorized — удаляем токен, чтобы приложение не застревало

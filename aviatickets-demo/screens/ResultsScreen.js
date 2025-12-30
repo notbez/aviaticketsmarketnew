@@ -1,5 +1,5 @@
 // screens/ResultsScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,19 @@ import {
   StyleSheet,
   SafeAreaView,
   TouchableOpacity,
-  Modal,
+  Animated,
+  PanResponder,
   Dimensions,
-  Animated
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
-import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 
 import FlightCard from '../components/FlightCard';
 import FlightDetails from '../components/FlightDetails';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
 
 export default function ResultsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -31,170 +33,167 @@ export default function ResultsScreen({ navigation }) {
     toName,
   } = route.params || {};
 
-  const { width } = Dimensions.get('window');
+  /* ===== MODAL ===== */
 
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [selectedFlight, setSelectedFlight] = useState(null);
-  const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
-  const getDisplayName = (code, fullName) => {
-    if (fullName) return fullName.split('(')[0].trim();
+  const translateY = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const overlayOpacity = translateY.interpolate({
+    inputRange: [0, SHEET_HEIGHT],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
 
-    const airports = {
-      SVO: 'Москва',
-      DME: 'Москва',
-      VKO: 'Москва',
-      TJM: 'Тюмень',
-      OVB: 'Новосибирск',
-    };
+  const closingRef = useRef(false);
 
-    return airports[code] || code;
+  /* ===== HELPERS ===== */
+
+  const cityName = (code, name) =>
+    name ? name.split('(')[0].trim() : code;
+
+  /* ===== OPEN / CLOSE ===== */
+
+  const openDetails = (flight) => {
+    closingRef.current = false;
+    setSelectedFlight(flight);
+    setDetailsVisible(true);
+
+    Animated.spring(translateY, {
+      toValue: 0,
+      damping: 22,
+      stiffness: 180,
+      useNativeDriver: true,
+    }).start();
   };
 
-const openDetails = (flight) => {
-  setSelectedFlight(flight);
-  setDetailsVisible(true);
+  const closeDetails = () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
 
-  Animated.timing(overlayOpacity, {
-    toValue: 1,
-    duration: 260,
-    useNativeDriver: true,
-  }).start();
-};
+    Animated.spring(translateY, {
+      toValue: SHEET_HEIGHT,
+      damping: 26,
+      stiffness: 220,
+      useNativeDriver: true,
+    }).start(() => {
+      setDetailsVisible(false);
+      setSelectedFlight(null);
+    });
+  };
 
-const closeDetails = () => {
-  Animated.timing(overlayOpacity, {
-    toValue: 0,
-    duration: 220,
-    useNativeDriver: true,
-  }).start(() => {
-    setDetailsVisible(false);
-    setSelectedFlight(null);
-  });
-};
+  /* ===== SWIPE ===== */
 
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => g.dy > 8,
+      onPanResponderMove: (_, g) => g.dy > 0 && translateY.setValue(g.dy),
+      onPanResponderRelease: (_, g) =>
+        g.dy > 120
+          ? closeDetails()
+          : Animated.spring(translateY, {
+              toValue: 0,
+              damping: 22,
+              stiffness: 180,
+              useNativeDriver: true,
+            }).start(),
+    })
+  ).current;
+
+  /* ===== HEADER (SCROLLABLE) ===== */
+
+  const ListHeader = () => (
+    <View style={{ paddingTop: insets.top + 10 }}>
+      {/* TOP BAR */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={navigation.goBack} style={styles.back}>
+          <MaterialIcons name="arrow-back" size={24} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Выбор рейса</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
+      {/* ROUTE */}
+      <View style={styles.routeCard}>
+        <Text
+          style={styles.city}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {cityName(from, fromName)}
+        </Text>
+
+        <View style={styles.planeWrap}>
+          <MaterialIcons name="flight" size={22} color="#0277bd" />
+        </View>
+
+        <Text
+          style={styles.city}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          {cityName(to, toName)}
+        </Text>
+      </View>
+
+      {/* COUNT */}
+      <Text style={styles.countText}>
+        Найдено вариантов: <Text style={styles.countBold}>{results.length}</Text>
+      </Text>
+    </View>
+  );
+
+  /* ===== RENDER ===== */
 
   return (
     <SafeAreaView style={styles.safe}>
-
-      {/* ===== WAVE BACKGROUND ===== */}
-      <View style={styles.waveWrapper}>
-        <Svg width={width} height={330} style={StyleSheet.absoluteFill}>
-          <Defs>
-            <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-  <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
-  <Stop offset="1" stopColor="#1EA6FF" stopOpacity="1" />
-</LinearGradient>
-
-            <LinearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
-  <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.18" />
-  <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-</LinearGradient>
-          </Defs>
-
-          <Path
-            d={`M0 0 L0 230 Q ${width / 2} 330 ${width} 230 L${width} 0 Z`}
-            fill="url(#grad)"
-          />
-
-          <Path
-  d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
-  fill="url(#lightGrad)"
-/>
-
-          <Path
-            d={`M0 120 Q ${width / 2} 240 ${width} 170 L${width} 0 L0 0 Z`}
-            fill="url(#lightGrad)"
-            opacity={0.4}
-          />
-        </Svg>
-
-        {/* ===== HEADER CONTENT ===== */}
-        <View style={[styles.waveContent, { paddingTop: insets.top + 20 }]}>
-          <TouchableOpacity onPress={navigation.goBack} style={styles.backIcon}>
-            <MaterialIcons name="arrow-back" size={26} color="#fff" />
-          </TouchableOpacity>
-
-          <Text style={styles.headerTitle}>Выберите рейс</Text>
-
-          <View style={styles.routeRow}>
-            <Text style={styles.routeCity}>
-              {getDisplayName(from, fromName)}
-            </Text>
-            <MaterialIcons
-              name="airplanemode-active"
-              size={22}
-              color="#fff"
-              style={{ marginHorizontal: 10 }}
-            />
-            <Text style={styles.routeCity}>
-              {getDisplayName(to, toName)}
-            </Text>
-          </View>
-
-          <Text style={styles.routeCodes}>
-            {from} — {to}
-          </Text>
-
-          <View style={styles.resultsChip}>
-  <MaterialIcons name="flight-takeoff" size={18} color="#0277bd" />
-  <Text style={styles.resultsChipText}>
-    Найдено {results.length} вариантов
-  </Text>
-</View>
-        </View>
-      </View>
-
-      {/* ===== LIST ===== */}
       <FlatList
         data={results}
         keyExtractor={(item, index) =>
           String(item.id ?? item.providerId ?? index)
         }
-        contentContainerStyle={{
-          paddingTop: 330,
-          paddingBottom: 24,
-        }}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={{ paddingBottom: 32 }}
         renderItem={({ item }) => (
-          <View style={styles.cardWrapper}>
+          <View style={styles.cardWrap}>
             <FlightCard item={item} onBook={() => openDetails(item)} />
           </View>
         )}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Рейсы не найдены</Text>
-            <Text style={styles.emptySubtitle}>
-              Попробуйте изменить параметры поиска
-            </Text>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={navigation.goBack}
-            >
-              <Text style={styles.backButtonText}>Изменить поиск</Text>
-            </TouchableOpacity>
-          </View>
-        }
       />
 
-      {/* ===== MODAL ===== */}
-      <Modal
-        visible={detailsVisible}
-        transparent
-        animationType="none"
-        onRequestClose={() => setDetailsVisible(false)}
-      >
-
-        <View style={styles.modalContainer}>
+      {/* OVERLAY + SHEET */}
+      {detailsVisible && (
+        <>
           <Animated.View
-    pointerEvents="none"
-    style={[
-      StyleSheet.absoluteFill,
-      {
-        backgroundColor: 'rgba(0,0,0,0.35)',
-        opacity: overlayOpacity,
-      },
-    ]}
-  />
+            style={[
+              StyleSheet.absoluteFill,
+              {
+                backgroundColor: 'rgba(0,0,0,0.3)',
+                opacity: overlayOpacity,
+                zIndex: 50,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              onPress={closeDetails}
+              activeOpacity={1}
+            />
+          </Animated.View>
+
+          <Animated.View
+            style={[
+              styles.sheet,
+              { transform: [{ translateY }] },
+            ]}
+          >
+            <View
+              style={styles.grabberZone}
+              {...panResponder.panHandlers}
+            >
+              <View style={styles.grabber} />
+            </View>
+
             {selectedFlight && (
               <FlightDetails
                 flight={selectedFlight}
@@ -202,142 +201,97 @@ const closeDetails = () => {
                 onClose={closeDetails}
               />
             )}
-          </View>
-      </Modal>
-
+          </Animated.View>
+        </>
+      )}
     </SafeAreaView>
   );
 }
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
+  safe: { flex: 1, backgroundColor: '#fff' },
 
-  waveWrapper: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 330,
-    zIndex: 10,
-  },
-
-  waveContent: {
-    paddingHorizontal: 20,
-  },
-
-  backIcon: {
-    padding: 8,
-    alignSelf: 'flex-start',
-  },
-
-  headerTitle: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-
-  routeRow: {
+  topBar: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 12,
   },
 
-  routeCity: {
-    color: '#fff',
-    fontSize: 18,
-  },
+  back: { padding: 6 },
 
-  routeCodes: {
-    color: '#fff',
-    fontSize: 14,
-    opacity: 0.8,
+  title: {
+    flex: 1,
     textAlign: 'center',
-    marginTop: 4,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#111',
   },
 
-  resultsHeader: {
-    marginTop: 18,
-    backgroundColor: '#ffffffdd',
-    padding: 12,
-    borderRadius: 12,
-    alignSelf: 'center',
+  routeCard: {
+    marginHorizontal: 20,
+    backgroundColor: '#f6f8fc',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 
-  resultsCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+  city: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111',
+    textAlign: 'center',
   },
 
-  resultsSubtext: {
+  planeWrap: {
+    width: 40,
+    alignItems: 'center',
+  },
+
+  countText: {
+    marginTop: 10,
+    marginBottom: 16,
+    marginHorizontal: 20,
     fontSize: 14,
     color: '#666',
   },
 
-  cardWrapper: {
+  countBold: {
+    fontWeight: '800',
+    color: '#111',
+  },
+
+  cardWrap: {
     marginHorizontal: 16,
     marginBottom: 16,
   },
 
-  emptyState: {
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    height: SHEET_HEIGHT,
+    width: '100%',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    overflow: 'hidden',
+    zIndex: 60,
+  },
+
+  grabberZone: {
+    paddingVertical: 12,
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
   },
 
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+  grabber: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#ccc',
   },
-
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-
-  backButton: {
-    backgroundColor: '#2aa8ff',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-modalContainer: {
-  flex: 1,
-  justifyContent: 'flex-end',
-},
-
-resultsChip: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-  marginTop: 60,
-  alignSelf: 'center',
-  backgroundColor: 'rgba(255,255,255,0.85)',
-  paddingHorizontal: 14,
-  paddingVertical: 8,
-  borderRadius: 20,
-},
-
-resultsChipText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#0277bd',
-},
 });
