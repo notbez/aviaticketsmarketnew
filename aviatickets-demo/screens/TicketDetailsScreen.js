@@ -19,12 +19,15 @@ import { api } from '../lib/api';
 import { API_URL } from '../config';
 import * as WebBrowser from 'expo-web-browser';
 
+import { normalizeFlightView } from '../utils/normalizeFlightView';
+import { getFlightView } from '../stores/FlightViewStore';
+
 export default function TicketDetailsScreen() {
   const route = useRoute();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
 
-  const { bookingId, flightView } = route.params;
+  const { bookingId, flightView: flightViewFromRoute } = route.params;
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,20 +57,38 @@ export default function TicketDetailsScreen() {
     return <Text>Билет не найден</Text>;
   }
 
-  const flight = {
-  from: flightView?.from,
-  to: flightView?.to,
-  date: flightView?.departureAt,
-  departTime: new Date(flightView?.departureAt).toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }),
-  arriveTime: new Date(flightView?.arrivalAt).toLocaleTimeString('ru-RU', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }),
-  cabinClass: flightView?.cabinClass,
-  price: flightView?.price,
+  // flightView из поиска приоритетнее, чем из booking
+  const storedFV = getFlightView(bookingId);
+
+  // ПРИОРИТЕТ:
+  // 1) route.params.flightView
+  // 2) store
+  // 3) booking.flightView
+  const rawFV =
+    flightViewFromRoute ??
+    storedFV ??
+    booking?.flightView;
+
+  const fv = normalizeFlightView(rawFV);
+
+const flight = {
+  from: fv?.from || '—',
+  to: fv?.to || '—',
+  date: fv?.departureAt,
+  departTime: fv?.departureAt
+    ? new Date(fv.departureAt).toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—',
+  arriveTime: fv?.arrivalAt
+    ? new Date(fv.arrivalAt).toLocaleTimeString('ru-RU', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—',
+  cabinClass: fv?.cabinClass || 'Economy',
+  price: fv?.price,
 };
 
   const passengers = booking?.passengers || [];
@@ -108,6 +129,9 @@ const openBlank = async () => {
     console.error('[Ticket] openBlank error', e);
     Alert.alert('Ошибка', 'Не удалось открыть билет');
   }
+
+  console.log('RAW flightView:', order.flightView);
+  console.log('NORMALIZED fv:', normalizeFlightView(order.flightView));
 };
 
   return (

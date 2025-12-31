@@ -108,10 +108,14 @@ export default function PassengerInfoScreen({ route, navigation }) {
 
     // ФИО
     if (!p0.lastName || !p0.firstName) {
-      const parts = (user.fullName || '').split(' ');
+      const parts = (user.fullName || '')
+        .trim()
+        .split(/\s+/)      // 🔥 КЛЮЧ
+        .filter(Boolean);  // 🔥 КЛЮЧ
+          
       next.lastName = p0.lastName || parts[0] || '';
       next.firstName = p0.firstName || parts[1] || '';
-      next.middleName = p0.middleName || parts[2] || '';
+      next.middleName = p0.middleName || parts.slice(2).join(' ') || '';
     }
 
     // Гражданство

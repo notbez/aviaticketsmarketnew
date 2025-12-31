@@ -124,15 +124,17 @@ export class FlightsService {
       this.logger.log(`[Onelya] RoutePricing completed in ${duration}ms, routes: ${routeResp?.Routes?.length || 0}`);
     } catch (err) {
       const duration = Date.now() - startTime;
-      this.logger.error(`[Onelya] RoutePricing failed after ${duration}ms`, err);
-      // fallback
-      const fallbackResults = this.getFallbackFlights();
-      this.logger.warn('[Onelya] Returning fallback demo flights');
+      this.logger.error(
+        `[Onelya] RoutePricing failed after ${duration}ms`,
+        err,
+      );
+    
       return {
-        error: false,
-        mock: true,
-        results: fallbackResults,
-        message: 'Используются демо-данные (RoutePricing failed)',
+        Routes: [],
+        results: [],
+        mock: false,
+        noResults: true,
+        message: 'Рейсы не найдены. Пожалуйста, измените параметры поиска.',
       };
     }
 
@@ -140,12 +142,14 @@ export class FlightsService {
 const routes: any[] = routeResp?.Routes || [];
 
 if (!routes.length) {
-  this.logger.error('[Onelya] RoutePricing returned empty Routes');
+  this.logger.log('[Onelya] No routes found for given search params');
+
   return {
     Routes: [],
     results: [],
     mock: false,
-    message: 'Нет доступных маршрутов',
+    noResults: true, // 🔥 ВАЖНО
+    message: 'Рейсы не найдены. Пожалуйста, измените параметры поиска.',
   };
 }
 
@@ -528,58 +532,6 @@ const cards = enrichedRoutes
 
     return result;
   }
-
-  /**
-   * Демка для fallback
-   */
-  private getFallbackFlights(): any[] {
-    return [
-      {
-        id: 'fallback-1',
-        price: 24730,
-        currency: 'RUB',
-        fares: [
-          {
-            title: 'Эконом - Базовый',
-            amount: 24730,
-            currency: 'RUB',
-            baggage: 'Без багажа',
-            carryOn: 'Ручная кладь 10 кг',
-            refund: 'Невозвратный',
-            exchange: 'Без обмена',
-          },
-        ],
-        segments: [
-          {
-            id: 'fallback-1-s1',
-            origin: 'VKO',
-            destination: 'TJM',
-            flights: [
-              {
-                marketingAirline: 'UT',
-                flightNumber: 'UT 126',
-                origin: 'VKO',
-                destination: 'TJM',
-                departureDateTime: '2025-12-10T09:30:00',
-                arrivalDateTime: '2025-12-10T15:00:00',
-                duration: '03:30:00',
-                serviceClass: 'Economic',
-                availableSeats: 9,
-              },
-            ],
-          },
-        ],
-        from: 'VKO',
-        to: 'TJM',
-        departTime: '2025-12-10T09:30:00',
-        arrivalTime: '2025-12-10T15:00:00',
-        duration: '3ч 30м',
-        stopsCount: 1,
-        providerRaw: null,
-      },
-    ];
-  }
-
   /* -----------------------
      Helpers
   ------------------------*/

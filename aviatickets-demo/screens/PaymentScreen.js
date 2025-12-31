@@ -13,17 +13,24 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
+import { saveFlightView } from '../stores/FlightViewStore';
+
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
   const {
-    bookingId,
-    amount = 0,
-    currency = '₽',
-    flightView,
-  } = route.params || {};
+      bookingId,
+      amount,
+      currency = '₽',
+      flightView,
+    } = route.params || {};
+
+    const finalAmount =
+      Number(amount) > 0
+        ? Number(amount)
+        : Number(flightView?.price || 0);
   const [loading, setLoading] = useState(false);
 
   const handlePayment = async () => {
@@ -41,6 +48,7 @@ export default function PaymentScreen() {
         bookingId,
         flightView, // ✅ КРИТИЧЕСКИ ВАЖНО
       });
+      saveFlightView(bookingId, flightView);
     } catch (e) {
       Alert.alert(
         'Ошибка оплаты',
@@ -69,7 +77,7 @@ export default function PaymentScreen() {
             Итого к оплате
           </Text>
           <Text style={styles.amountValue}>
-            {Number(amount).toLocaleString('ru-RU')} {currency}
+            {finalAmount.toLocaleString('ru-RU')} {currency}
           </Text>
         </View>
 

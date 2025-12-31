@@ -119,7 +119,10 @@ export default function AccountScreen({ navigation }) {
         ? new Date(data.passport.expiryDate).toISOString().split('T')[0]
         : '';
 
-      const parts = (data.fullName || '').split(' ');
+      const parts = (data.fullName || '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean);
 
       const profileData = {
         lastName: parts[0] || '',

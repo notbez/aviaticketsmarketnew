@@ -21,6 +21,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+
 /* ================= CONST (КАК В PassengerInfoScreen) ================= */
 
 const COUNTRIES = [
@@ -38,6 +39,43 @@ const formatHuman = (iso) => {
   return `${d}.${m}.${y}`;
 };
 
+
+const formatPhoneRU = (value = '') => {
+  // оставляем только цифры
+  let digits = value.replace(/\D/g, '');
+
+  // если начали с 8 — заменяем на 7
+  if (digits.startsWith('8')) {
+    digits = '7' + digits.slice(1);
+  }
+
+  // если ввели без кода — считаем что это РФ
+  if (digits.length && !digits.startsWith('7')) {
+    digits = '7' + digits;
+  }
+
+  const d = digits.slice(0, 11);
+
+  let formatted = '+7';
+
+  if (d.length > 1) {
+    formatted += ' (' + d.slice(1, 4);
+  }
+  if (d.length >= 5) {
+    formatted += ') ' + d.slice(4, 7);
+  }
+  if (d.length >= 8) {
+    formatted += '-' + d.slice(7, 9);
+  }
+  if (d.length >= 10) {
+    formatted += '-' + d.slice(9, 11);
+  }
+
+  return formatted;
+};
+
+const normalizePhoneRU = (value = '') =>
+  '+' + value.replace(/\D/g, '').slice(0, 11);
 /* ================= SCREEN ================= */
 
 export default function SignUpScreen({ route, navigation }) {
@@ -159,7 +197,7 @@ export default function SignUpScreen({ route, navigation }) {
             <Input label="Отчество (необязательно)" placeholder="Иванович" value={middleName} onChangeText={setMiddleName} />
 
             <Input label="Email" placeholder="example@mail.com" value={email} onChangeText={setEmail} />
-            <Input label="Телефон" placeholder="+7 900 000-00-00" value={phone} onChangeText={setPhone} />
+            <Input label="Телефон" placeholder="+7 (999) 888-77-66" keyboardType="phone-pad" value={formatPhoneRU(phone)} onChangeText={(t) => setPhone(normalizePhoneRU(t))} />
 
             <Input label="Пароль" placeholder="Минимум 6 символов" secureTextEntry value={password} onChangeText={setPassword} />
             <Input label="Подтвердите пароль" placeholder="Повторите пароль" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />

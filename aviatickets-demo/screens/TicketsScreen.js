@@ -13,6 +13,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { normalizeFlightView } from '../utils/normalizeFlightView';
+import { getFlightView } from '../stores/FlightViewStore';
+
 
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -26,87 +29,108 @@ export default function TicketsScreen({ navigation }) {
     }
   }, [token]);
 
-  const loadOrders = async () => {
-    try {
-      setLoading(true);
-      const data = await api('/booking');
+const loadOrders = async () => {
+  try {
+    setLoading(true);
+    const data = await api('/booking');
 
-      const mapped = (data || []).map((b) => ({
-        orderId: b._id,
-        flight: {
-          from: b.from,
-          to: b.to,
-          date: b.departureDate,
-          departTime: b.departTime || '—',
-          arriveTime: b.arriveTime || '—',
-          airline: b.provider || 'ONELYA AIR',
-          cabinClass: b.cabinClass || 'Economy',
-          duration: '',
-        },
-        passengers: b.passengers || [],
-        bookingStatus: b.bookingStatus,
-      }));
+    const enriched = await Promise.all(
+      (data || []).map(async (b) => {
+        try {
+          const full = await api(`/booking/${b._id}`);
 
-      setOrders(mapped);
-    } catch (e) {
-      console.error('Load bookings error:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderOrder = (order) => {
-    const { flight } = order;
-    if (!flight) return null;
-
-    return (
-      <View key={order.orderId} style={styles.card}>
-        {/* HEADER */}
-        <View style={styles.cardHeader}>
-          <View style={styles.airlineIcon}>
-            <MaterialIcons name="flight" size={22} color="#0277bd" />
-          </View>
-          <View>
-            <Text style={styles.airlineName}>{flight.airline}</Text>
-            <Text style={styles.orderId}>
-              Заказ № {order.orderId.slice(0, 8)}
-            </Text>
-          </View>
-        </View>
-
-        {/* ROUTE */}
-        <View style={styles.route}>
-          <View style={styles.cityBlock}>
-            <Text style={styles.time}>{flight.departTime}</Text>
-            <Text style={styles.city}>{flight.from}</Text>
-          </View>
-
-          <View style={styles.middle}>
-            <MaterialIcons name="flight" size={16} color="#0277bd" />
-            <View style={styles.line} />
-            <Text style={styles.duration}>В пути</Text>
-          </View>
-
-          <View style={styles.cityBlock}>
-            <Text style={styles.time}>{flight.arriveTime}</Text>
-            <Text style={styles.city}>{flight.to}</Text>
-          </View>
-        </View>
-
-        {/* ACTION */}
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() =>
-            navigation.navigate('TicketDetails', {
-              bookingId: order.orderId,
-            })
-          }
-        >
-          <Text style={styles.primaryText}>Открыть билет</Text>
-        </TouchableOpacity>
-      </View>
+          return {
+            orderId: b._id,
+            bookingStatus: b.bookingStatus,
+            flightView:
+              getFlightView(b._id) || full.flightView,
+          };
+        } catch {
+          return {
+            orderId: b._id,
+            bookingStatus: b.bookingStatus,
+            flightView: null,
+          };
+        }
+      })
     );
-  };
+
+    setOrders(enriched);
+  } catch (e) {
+    console.error('Load bookings error:', e);
+  } finally {
+    setLoading(false);
+  }
+};
+  const renderOrder = (order) => {
+  console.log('RAW flightView:', order.flightView);
+  const fv = normalizeFlightView(order.flightView);
+  console.log('NORMALIZED fv:', fv);
+
+  return (
+    <View key={order.orderId} style={styles.card}>
+      {/* HEADER */}
+      <View style={styles.cardHeader}>
+        <View style={styles.airlineIcon}>
+          <MaterialIcons name="flight" size={22} color="#0277bd" />
+        </View>
+        <View>
+          <Text style={styles.airlineName}>
+            ONELYA AIR
+          </Text>
+          <Text style={styles.orderId}>
+            Заказ № {order.orderId.slice(0, 8)}
+          </Text>
+        </View>
+      </View>
+
+      {/* ROUTE */}
+      <View style={styles.route}>
+        <View style={styles.cityBlock}>
+          <Text style={styles.time}>
+            {fv?.departureAt
+              ? new Date(fv.departureAt).toLocaleTimeString('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—'}
+          </Text>
+          <Text style={styles.city}>{fv?.from || '—'}</Text>
+        </View>
+
+        <View style={styles.middle}>
+          <MaterialIcons name="flight" size={16} color="#0277bd" />
+          <View style={styles.line} />
+          <Text style={styles.duration}>В пути</Text>
+        </View>
+
+        <View style={styles.cityBlock}>
+          <Text style={styles.time}>
+            {fv?.arrivalAt
+              ? new Date(fv.arrivalAt).toLocaleTimeString('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—'}
+          </Text>
+          <Text style={styles.city}>{fv?.to || '—'}</Text>
+        </View>
+      </View>
+
+      {/* ACTION */}
+      <TouchableOpacity
+        style={styles.primaryBtn}
+        onPress={() =>
+          navigation.navigate('TicketDetails', {
+            bookingId: order.orderId,
+          })
+        }
+      >
+        <Text style={styles.primaryText}>Открыть билет</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
   return (
     <SafeAreaView style={styles.safe}>

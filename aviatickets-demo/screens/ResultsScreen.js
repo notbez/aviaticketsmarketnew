@@ -26,12 +26,14 @@ export default function ResultsScreen({ navigation }) {
   const route = useRoute();
 
   const {
-    results = [],
-    from,
-    to,
-    fromName,
-    toName,
-  } = route.params || {};
+  results = [],
+  from,
+  to,
+  fromName,
+  toName,
+  noResults,
+  message,
+} = route.params || {};
 
   /* ===== MODAL ===== */
 
@@ -144,6 +146,42 @@ export default function ResultsScreen({ navigation }) {
   );
 
   /* ===== RENDER ===== */
+  if (noResults) {
+  return (
+    <SafeAreaView
+      style={[
+        styles.safe,
+        { justifyContent: 'center', alignItems: 'center' },
+      ]}
+    >
+      <MaterialIcons name="search-off" size={64} color="#ccc" />
+
+      <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '700' }}>
+        Рейсы не найдены
+      </Text>
+
+      <Text
+        style={{
+          marginTop: 8,
+          fontSize: 14,
+          color: '#666',
+          textAlign: 'center',
+        }}
+      >
+        {message || 'Попробуйте изменить параметры поиска'}
+      </Text>
+
+      <TouchableOpacity
+        style={{ marginTop: 24 }}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={{ color: '#0277bd', fontWeight: '700' }}>
+          Изменить поиск
+        </Text>
+      </TouchableOpacity>
+    </SafeAreaView>
+  );
+}
 
   return (
     <SafeAreaView style={styles.safe}>
