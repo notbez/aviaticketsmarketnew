@@ -4,47 +4,77 @@ import {
   View,
   Text,
   TouchableOpacity,
-  StyleSheet,
   Image,
+  StyleSheet,
 } from 'react-native';
+import { getAirlineLogo } from '../utils/airlineLogos';
 
 export default function FlightCard({ item, onBook }) {
-  const firstSegment = item?.segments?.[0];
-  const lastSegment = item?.segments?.[item.segments.length - 1];
+  const outbound = item?.outbound;
+  const inbound = item?.inbound;
 
-  const firstFlight = firstSegment?.flights?.[0] || null;
-  const lastFlight =
-    lastSegment?.flights?.[lastSegment.flights.length - 1] || null;
+  // ===== GUARD =====
+  if (!outbound || !Array.isArray(outbound.segments)) {
+    return null;
+  }
 
+  // ===== OUTBOUND SEGMENTS =====
+  const outboundSegments = outbound.segments;
+
+  const firstOutboundSegment = outboundSegments[0];
+  const lastOutboundSegment =
+    outboundSegments[outboundSegments.length - 1];
+
+  const firstOutboundFlight =
+    firstOutboundSegment?.flights?.[0] || null;
+
+  const lastOutboundFlight =
+    lastOutboundSegment?.flights?.[
+      lastOutboundSegment.flights.length - 1
+    ] || null;
+
+  // ===== FORMATTERS =====
   const formatTime = (iso) => {
     if (!iso) return '-';
-    try {
-      const d = new Date(iso);
-      return d.toISOString().substring(11, 16);
-    } catch {
-      return iso;
-    }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '-';
+    return d.toISOString().substring(11, 16);
   };
 
-  const airline = firstFlight?.marketingAirline || 'Авиакомпания';
-  const flightNumber = firstFlight?.flightNumber || '—';
+  const calcDuration = (start, end) => {
+    if (!start || !end) return '—';
+    const diff = new Date(end) - new Date(start);
+    if (isNaN(diff)) return '—';
 
-  const departTime = formatTime(item.departTime);
-  const arrivalTime = formatTime(item.arrivalTime);
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    return `${h}ч ${m}м`;
+  };
 
-  const stops = item.stopsCount || 0;
+  // ===== DATA =====
+  const airline =
+    firstOutboundFlight?.marketingAirline || 'Авиакомпания';
+
+  const flightNumber =
+    firstOutboundFlight?.flightNumber || '—';
+
+  const stops = Math.max(0, outboundSegments.length - 1);
+
   const availableSeats =
-    firstFlight?.availableSeats ?? lastFlight?.availableSeats ?? null;
+    firstOutboundFlight?.availableSeats ??
+    lastOutboundFlight?.availableSeats ??
+    null;
 
+  // ===== RENDER =====
   return (
     <View style={styles.cardWrapper}>
       <View style={styles.card}>
 
-        {/* ===== HEADER ===== */}
+        {/* HEADER */}
         <View style={styles.headerRow}>
           <View style={styles.airlineRow}>
             <Image
-              source={require('../assets/plane.png')}
+              source={getAirlineLogo(firstOutboundFlight?.airlineCode)}
               style={styles.logo}
             />
             <View>
@@ -59,48 +89,78 @@ export default function FlightCard({ item, onBook }) {
             <Text style={styles.price}>
               {item.price?.toLocaleString('ru-RU')} ₽
             </Text>
-
-            {item.fares && item.fares.length > 1 && (
-              <Text style={styles.tariffCount}>
-                {item.fares.length} тарифа
-              </Text>
-            )}
           </View>
         </View>
 
-        {/* ===== ROUTE ===== */}
+        {/* OUTBOUND */}
         <View style={styles.routeRow}>
           <View>
-            <Text style={styles.time}>{departTime}</Text>
-            <Text style={styles.code}>{item.from}</Text>
+            <Text style={styles.time}>
+              {formatTime(outbound.departTime)}
+            </Text>
+            <Text style={styles.code}>{outbound.from}</Text>
           </View>
 
           <View style={styles.routeCenter}>
             <Text style={styles.duration}>
-              {item.duration || firstFlight?.duration || '—'}
+              {calcDuration(
+                outbound.departTime,
+                outbound.arrivalTime
+              )}
             </Text>
             <View style={styles.line} />
             <Text style={styles.stops}>
-              {stops === 0 ? 'Без пересадок' : `${stops} пересадки`}
+              {stops === 0
+                ? 'Без пересадок'
+                : `${stops} пересадки`}
             </Text>
           </View>
 
           <View style={{ alignItems: 'flex-end' }}>
-            <Text style={styles.time}>{arrivalTime}</Text>
-            <Text style={styles.code}>{item.to}</Text>
+            <Text style={styles.time}>
+              {formatTime(outbound.arrivalTime)}
+            </Text>
+            <Text style={styles.code}>{outbound.to}</Text>
           </View>
         </View>
 
-        {/* ===== TEAR LINE ===== */}
-        <View style={styles.tearRow}>
-          <View style={styles.cutLeft} />
-          <View style={styles.dashedLine} />
-          <View style={styles.cutRight} />
-        </View>
+        {/* INBOUND */}
+        {inbound && Array.isArray(inbound.segments) && (
+          <View style={[styles.routeRow, { marginTop: 14 }]}>
+            <View>
+              <Text style={styles.time}>
+                {formatTime(inbound.departTime)}
+              </Text>
+              <Text style={styles.code}>{inbound.from}</Text>
+            </View>
 
-        {/* ===== FOOTER ===== */}
+            <View style={styles.routeCenter}>
+              <Text style={styles.duration}>
+                {calcDuration(
+                  inbound.departTime,
+                  inbound.arrivalTime
+                )}
+              </Text>
+              <View style={styles.line} />
+              <Text style={styles.stops}>
+                {Math.max(0, inbound.segments.length - 1) === 0
+                  ? 'Без пересадок'
+                  : `${inbound.segments.length - 1} пересадки`}
+              </Text>
+            </View>
+
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={styles.time}>
+                {formatTime(inbound.arrivalTime)}
+              </Text>
+              <Text style={styles.code}>{inbound.to}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* FOOTER */}
         <View style={styles.footerRow}>
-          {(availableSeats !== null && availableSeats <= 5) && (
+          {availableSeats !== null && availableSeats <= 5 && (
             <Text style={styles.warningText}>
               Осталось мест: {availableSeats}
             </Text>
@@ -111,10 +171,11 @@ export default function FlightCard({ item, onBook }) {
             onPress={() => onBook(item)}
           >
             <Text style={styles.bookButtonText}>
-    Забронировать
-  </Text>
+              Забронировать
+            </Text>
           </TouchableOpacity>
         </View>
+
       </View>
     </View>
   );

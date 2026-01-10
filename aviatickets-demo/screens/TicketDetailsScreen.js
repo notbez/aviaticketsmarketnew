@@ -19,9 +19,6 @@ import { api } from '../lib/api';
 import { API_URL } from '../config';
 import * as WebBrowser from 'expo-web-browser';
 
-import { normalizeFlightView } from '../utils/normalizeFlightView';
-import { getFlightView } from '../stores/FlightViewStore';
-
 export default function TicketDetailsScreen() {
   const route = useRoute();
   const navigation = useNavigation();
@@ -57,39 +54,17 @@ export default function TicketDetailsScreen() {
     return <Text>Билет не найден</Text>;
   }
 
-  // flightView из поиска приоритетнее, чем из booking
-  const storedFV = getFlightView(bookingId);
+  const fv =
+  booking?.flightView ??
+  flightViewFromRoute;
 
-  // ПРИОРИТЕТ:
-  // 1) route.params.flightView
-  // 2) store
-  // 3) booking.flightView
-  const rawFV =
-    flightViewFromRoute ??
-    storedFV ??
-    booking?.flightView;
-
-  const fv = normalizeFlightView(rawFV);
-
-const flight = {
-  from: fv?.from || '—',
-  to: fv?.to || '—',
-  date: fv?.departureAt,
-  departTime: fv?.departureAt
-    ? new Date(fv.departureAt).toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '—',
-  arriveTime: fv?.arrivalAt
-    ? new Date(fv.arrivalAt).toLocaleTimeString('ru-RU', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    : '—',
-  cabinClass: fv?.cabinClass || 'Economy',
-  price: fv?.price,
-};
+  if (!fv) {
+  return (
+    <SafeAreaView style={styles.center}>
+      <Text>Данные рейса недоступны</Text>
+    </SafeAreaView>
+  );
+}
 
   const passengers = booking?.passengers || [];
 
@@ -129,9 +104,6 @@ const openBlank = async () => {
     console.error('[Ticket] openBlank error', e);
     Alert.alert('Ошибка', 'Не удалось открыть билет');
   }
-
-  console.log('RAW flightView:', order.flightView);
-  console.log('NORMALIZED fv:', normalizeFlightView(order.flightView));
 };
 
   return (
@@ -149,26 +121,72 @@ const openBlank = async () => {
         {/* ROUTE */}
         <View style={styles.routeCard}>
           <Text style={styles.route}>
-            {flight.from} → {flight.to}
-          </Text>
-          <Text style={styles.date}>{formatDate(flight.date)}</Text>
+  {fv.type === 'roundtrip'
+    ? `${fv.from} → ${fv.to} → ${fv.from}`
+    : `${fv.from} → ${fv.to}`}
+</Text>
 
-          <View style={styles.timeRow}>
-            <View>
-              <Text style={styles.label}>Вылет</Text>
-              <Text style={styles.value}>{flight.departTime || '—'}</Text>
-            </View>
-            <View>
-              <Text style={styles.label}>Прилёт</Text>
-              <Text style={styles.value}>{flight.arriveTime || '—'}</Text>
-            </View>
-            <View>
-              <Text style={styles.label}>Класс</Text>
-              <Text style={styles.value}>
-                {flight.cabinClass || 'Economy'}
-              </Text>
-            </View>
-          </View>
+<Text style={styles.date}>
+  {formatDate(fv?.outbound?.departAt)}
+</Text>
+{fv.outbound && (
+  <>
+    <View style={styles.segmentHeader}>
+      <Text style={styles.segmentTitle}>Туда</Text>
+    </View>
+
+    <View style={styles.timeRow}>
+      <View>
+        <Text style={styles.label}>Вылет</Text>
+        <Text style={styles.value}>
+          {new Date(fv.outbound.departAt).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Прилёт</Text>
+        <Text style={styles.value}>
+          {new Date(fv.outbound.arriveAt).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      </View>
+    </View>
+  </>
+)}
+{fv.inbound && (
+  <>
+    <View style={[styles.segmentHeader, { marginTop: 12 }]}>
+      <Text style={styles.segmentTitle}>Обратно</Text>
+    </View>
+
+    <View style={styles.timeRow}>
+      <View>
+        <Text style={styles.label}>Вылет</Text>
+        <Text style={styles.value}>
+          {new Date(fv.inbound.departAt).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      </View>
+
+      <View>
+        <Text style={styles.label}>Прилёт</Text>
+        <Text style={styles.value}>
+          {new Date(fv.inbound.arriveAt).toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+          })}
+        </Text>
+      </View>
+    </View>
+  </>
+)}
         </View>
 
         {/* PASSENGERS */}

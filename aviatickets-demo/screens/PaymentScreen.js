@@ -1,5 +1,5 @@
 // screens/PaymentScreen.js
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,47 +8,63 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { saveFlightView } from '../stores/FlightViewStore';
-
 
 export default function PaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
-  const {
-      bookingId,
-      amount,
-      currency = '₽',
-      flightView,
-    } = route.params || {};
 
-    const finalAmount =
-      Number(amount) > 0
-        ? Number(amount)
-        : Number(flightView?.price || 0);
+  const {
+    bookingId,
+    amount,
+    currency = '₽',
+    flightView,
+  } = route.params || {};
+
+  const finalAmount = Number(amount);
   const [loading, setLoading] = useState(false);
 
+  /* ===== ANIMATION (UI ONLY) ===== */
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  /* ===== PAYMENT LOGIC — НЕ ТРОГАЕМ ===== */
   const handlePayment = async () => {
     try {
       setLoading(true);
 
-      // 2. Virtual pay
       await api(`/booking/${bookingId}/pay`, { method: 'POST' });
-
-      // 3. Confirm (создаёт билет)
       await api(`/booking/${bookingId}/confirm`, { method: 'POST' });
 
-      // 4. Всегда переходим к билету
+      saveFlightView(bookingId, flightView);
+
       navigation.replace('TicketDetails', {
         bookingId,
-        flightView, // ✅ КРИТИЧЕСКИ ВАЖНО
+        flightView,
       });
-      saveFlightView(bookingId, flightView);
+
     } catch (e) {
       Alert.alert(
         'Ошибка оплаты',
@@ -70,17 +86,38 @@ export default function PaymentScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* CONTENT */}
-      <View style={styles.content}>
+      <Animated.View
+        style={[
+          styles.content,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: translateAnim }],
+          },
+        ]}
+      >
+        {/* AMOUNT CARD */}
         <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>
-            Итого к оплате
-          </Text>
+          <Text style={styles.amountLabel}>Итого к оплате</Text>
           <Text style={styles.amountValue}>
             {finalAmount.toLocaleString('ru-RU')} {currency}
           </Text>
+
+          <View style={styles.divider} />
+
+          <View style={styles.detailRow}>
+            <FontAwesome5 name="ticket-alt" size={16} color="#0277bd" />
+            <Text style={styles.detailText}>Авиабилет</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <MaterialIcons name="security" size={18} color="#0277bd" />
+            <Text style={styles.detailText}>
+              Безопасный платёж
+            </Text>
+          </View>
         </View>
 
+        {/* PAY BUTTON */}
         <TouchableOpacity
           style={[
             styles.payButton,
@@ -88,16 +125,19 @@ export default function PaymentScreen() {
           ]}
           onPress={handlePayment}
           disabled={loading}
+          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.payButtonText}>
-              Оплатить
-            </Text>
+            <>
+              <Text style={styles.payButtonText}>
+                Оплатить
+              </Text>
+            </>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <View style={{ height: insets.bottom }} />
     </SafeAreaView>
@@ -134,29 +174,71 @@ const styles = StyleSheet.create({
 
   amountCard: {
     backgroundColor: '#f2f8ff',
-    borderRadius: 20,
+    borderRadius: 22,
     padding: 24,
-    alignItems: 'center',
-    marginTop: 40,
+    marginTop: 32,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
 
   amountLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#555',
   },
 
   amountValue: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '800',
     color: '#0277bd',
-    marginTop: 8,
+    marginTop: 6,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#dbe9f6',
+    marginVertical: 16,
+  },
+
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+
+  detailText: {
+    marginLeft: 10,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111',
+  },
+
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f8fb',
+    borderRadius: 16,
+    padding: 14,
+    marginTop: 24,
+  },
+
+  infoText: {
+    marginLeft: 10,
+    fontSize: 13,
+    color: '#444',
+    flex: 1,
   },
 
   payButton: {
+    marginTop: 32,
     backgroundColor: '#0277bd',
     paddingVertical: 18,
-    borderRadius: 16,
+    borderRadius: 18,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
   },
 
   payButtonDisabled: {
@@ -166,6 +248,6 @@ const styles = StyleSheet.create({
   payButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
   },
 });

@@ -1,3 +1,4 @@
+
 // screens/TicketsScreen.js
 import React, { useEffect, useState } from 'react';
 import {
@@ -88,12 +89,12 @@ const loadOrders = async () => {
       <View style={styles.route}>
         <View style={styles.cityBlock}>
           <Text style={styles.time}>
-            {fv?.departureAt
-              ? new Date(fv.departureAt).toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '—'}
+            {fv?.outbound?.departAt
+            ? new Date(fv.outbound.departAt).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : '—'}
           </Text>
           <Text style={styles.city}>{fv?.from || '—'}</Text>
         </View>
@@ -106,8 +107,8 @@ const loadOrders = async () => {
 
         <View style={styles.cityBlock}>
           <Text style={styles.time}>
-            {fv?.arrivalAt
-              ? new Date(fv.arrivalAt).toLocaleTimeString('ru-RU', {
+            {fv?.outbound?.arriveAt
+              ? new Date(fv.outbound.arriveAt).toLocaleTimeString('ru-RU', {
                   hour: '2-digit',
                   minute: '2-digit',
                 })
@@ -116,6 +117,41 @@ const loadOrders = async () => {
           <Text style={styles.city}>{fv?.to || '—'}</Text>
         </View>
       </View>
+
+      {/* ROUTE — INBOUND */}
+      {fv?.inbound && (
+        <View style={styles.route}>
+          <View style={styles.cityBlock}>
+            <Text style={styles.time}>
+              {fv.inbound.departAt
+                ? new Date(fv.inbound.departAt).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '—'}
+            </Text>
+            <Text style={styles.city}>{fv?.to || '—'}</Text>
+          </View>
+                
+          <View style={styles.middle}>
+            <MaterialIcons name="flight" size={16} color="#0277bd" />
+            <View style={styles.line} />
+            <Text style={styles.duration}>В пути</Text>
+          </View>
+                
+          <View style={styles.cityBlock}>
+            <Text style={styles.time}>
+              {fv.inbound.arriveAt
+                ? new Date(fv.inbound.arriveAt).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '—'}
+            </Text>
+            <Text style={styles.city}>{fv?.from || '—'}</Text>
+          </View>
+        </View>
+      )}
 
       {/* ACTION */}
       <TouchableOpacity

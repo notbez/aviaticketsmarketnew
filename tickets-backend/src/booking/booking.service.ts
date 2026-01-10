@@ -135,16 +135,12 @@ if (body.brandId) {
   }));
 }
 
-if (typeof providerRoute.RouteGroup !== 'number') {
-  providerRoute.RouteGroup = 0;
-}
-
 if (!providerRoute) {
   throw new BadRequestException('Offer corrupted or expired');
 }
 
-    this.logger.log(
-  `[Booking] Creating reservation from offer=${offerId}, routeGroup=${providerRoute.RouteGroup}`,
+this.logger.log(
+  `[Booking] Creating reservation from offer=${offerId}, flights=${providerRoute.Flights.length}`,
 );
 
 // 0️⃣ FARE INFO BY ROUTE — ОБЯЗАТЕЛЬНО ПЕРЕД CREATE
@@ -160,7 +156,7 @@ const fareInfo = await this.onelyaService.fareInfoByRoute({
     ServiceClass: 'Economic',
     ServiceSubclass: f.ServiceSubclass,
     FareCode: f.FareCode,          // ✅ ТОЛЬКО FareCode
-    FlightGroup: f.RouteGroup,
+    FlightGroup: f.FlightGroup,
   })),
   FlightIndex: 0,
   AdultQuantity: passengers.filter(p => p.customerType === 'Adult').length,
@@ -200,14 +196,11 @@ this.logger.log(
 );
 
 const price =
-  recalced?.Prices?.[0]?.Amount ??
-  providerRoute?.Cost ??
+  recalced?.AmountAfter ??
+  recalced?.RecalcResults?.[0]?.Amount ??
   0;
 
-const currency =
-  recalced?.Prices?.[0]?.Currency ??
-  providerRoute?.Currency ??
-  'RUB';
+const currency = 'RUB';
 
 
   const firstFlight = providerRoute.Flights[0];
@@ -215,6 +208,8 @@ const currency =
 const from = firstFlight.OriginAirportCode;
 const to = firstFlight.DestinationAirportCode;
 const departureDate = new Date(firstFlight.DepartureDateTime);
+
+this.logger.warn('[RECALC RAW]', JSON.stringify(recalced, null, 2));
 
 // 3️⃣ SAVE BOOKING
 const booking = new this.bookingModel({
@@ -228,6 +223,8 @@ const booking = new this.bookingModel({
   providerBookingId: String(orderId),
   bookingStatus: 'created',
   provider: 'onelya',
+
+  flightView: body.flightView ?? null,
 
   payment: {
     paymentStatus: 'pending',

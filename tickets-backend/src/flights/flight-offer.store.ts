@@ -1,14 +1,12 @@
 export interface FlightOffer {
   offerId: string;
 
-
   providerRoute: any;
-
-
   providerRaw: any;
 
-  brandFares?: any[] | null;
+  passengers?: number; // 🔥 ВАЖНО
 
+  brandFares?: any[] | null;
   __brandFareFlights?: any[];
 }
 

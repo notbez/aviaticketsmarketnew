@@ -27,11 +27,27 @@ export const normalizeFlightView = (fv) => {
   }
 
   return {
+  from: from || null,
+  to: to || null,
+
+  // legacy (оставляем!)
+  departureAt: departureAt || null,
+  arrivalAt: arrivalAt || null,
+
+  // 🔥 ДОБАВЛЯЕМ КАНОНИЧЕСКИЙ ФОРМАТ
+  outbound: fv.outbound ?? {
     from: from || null,
     to: to || null,
-    departureAt: departureAt || null,
-    arrivalAt: arrivalAt || null,
-    cabinClass: fv.cabinClass || fv.class || 'Economy',
-    price: fv.price,
-  };
+    departAt: departureAt || null,
+    arriveAt: arrivalAt || null,
+    duration: fv.duration || null,
+  },
+
+  inbound: fv.inbound ?? null,
+
+  type: fv.inbound ? 'roundtrip' : 'oneway',
+
+  cabinClass: fv.cabinClass || fv.class || 'Economy',
+  price: fv.price,
+};
 };

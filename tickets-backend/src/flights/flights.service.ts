@@ -159,17 +159,11 @@ const enrichedRoutes = routes.map(providerRoute => {
 
   const firstFlight = providerRoute?.Segments?.[0]?.Flights?.[0];
 
-const routeGroup =
-  providerRoute?.Segments?.[0]?.Flights?.[0]?.RouteGroup ?? 0;
-
 const providerRaw = {
   Gds: providerRoute.Gds,
 
-  // 🔥 ВАЖНО: RouteGroup НА ВЕРХНЕМ УРОВНЕ
-  RouteGroup: routeGroup,
-
-  Flights: providerRoute.Segments.flatMap(s =>
-    s.Flights.map(f => ({
+  Flights: providerRoute.Segments.flatMap((segment, segmentIndex) =>
+    segment.Flights.map(f => ({
       MarketingAirlineCode: f.MarketingAirlineCode,
       OperatingAirlineCode: f.OperatingAirlineCode,
       FlightNumber: f.FlightNumber,
@@ -181,8 +175,8 @@ const providerRaw = {
       ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
       FareCode: f.FareCode,
 
-      // оставляем тут тоже — Onelya использует
-      RouteGroup: f.RouteGroup ?? routeGroup,
+      // 🔥 ВОТ ЗДЕСЬ сегментация
+      FlightGroup: segmentIndex, // 0 = туда, 1 = обратно
     })),
   ),
 };
@@ -191,6 +185,7 @@ const providerRaw = {
     offerId,
     providerRaw,
     providerRoute,
+    passengers,
   });
 
   return {
@@ -229,10 +224,23 @@ const cards = enrichedRoutes
 
     const segments = this.extractSegments(route);
 
-    const firstSeg = segments[0];
-    const lastSeg = segments[segments.length - 1];
-    const firstFlight = firstSeg?.flights?.[0] || null;
-    const lastFlight = lastSeg?.flights?.slice(-1)[0] || null;
+    // 🔥 разделяем сегменты по направлению
+    const outboundSegments = segments[0] ? [segments[0]] : [];
+    const inboundSegments = segments[1] ? [segments[1]] : [];
+
+    const outboundFirstFlight =
+      outboundSegments?.[0]?.flights?.[0] || null;
+
+    const outboundLastFlight =
+      outboundSegments?.[outboundSegments.length - 1]?.flights?.slice(-1)[0] ||
+      null;
+
+    const inboundFirstFlight =
+      inboundSegments?.[0]?.flights?.[0] || null;
+
+    const inboundLastFlight =
+  inboundSegments?.[inboundSegments.length - 1]?.flights?.slice(-1)[0] ||
+  null;
 
 
     const price =
@@ -248,13 +256,30 @@ const cards = enrichedRoutes
       price: Number.isFinite(Number(price)) ? Number(price) : null,
       currency: route?.Currency || 'RUB',
       fares,
-      segments,
-      from: firstSeg?.origin || null,
-      to: lastSeg?.destination || null,
-      departTime: firstFlight?.departureDateTime || null,
-      arrivalTime: lastFlight?.arrivalDateTime || null,
+
+      // 🔥 ВАЖНО
+      outbound: {
+        segments: outboundSegments,
+        from: outboundFirstFlight?.origin || null,
+        to: outboundLastFlight?.destination || null,
+        departTime: outboundFirstFlight?.departureDateTime || null,
+        arrivalTime: outboundLastFlight?.arrivalDateTime || null,
+      },
+    
+      inbound:
+        inboundSegments.length > 0
+          ? {
+              segments: inboundSegments,
+              from: inboundFirstFlight?.origin || null,
+              to: inboundLastFlight?.destination || null,
+              departTime:
+                inboundFirstFlight?.departureDateTime || null,
+              arrivalTime:
+                inboundLastFlight?.arrivalDateTime || null,
+            }
+          : null,
+          
       duration: route?.Duration || null,
-      stopsCount: Math.max(0, (segments.length - 1)),
     };
   }
 
@@ -265,6 +290,7 @@ const cards = enrichedRoutes
       const flights = Array.isArray(segment.Flights) ? segment.Flights.map((f: any) => ({
         marketingAirline: f.MarketingAirlineCode || f.MarketingAirline || null,
         operatingAirline: f.OperatingAirlineCode || f.OperatingAirline || null, 
+        airlineCode: f.MarketingAirlineCode || null,
         flightNumber: `${(f.MarketingAirlineCode || '')} ${f.FlightNumber || ''}`.trim(),
         origin: f.OriginAirportCode || segment.OriginCode || null,
         destination: f.DestinationAirportCode || segment.DestinationCode || null,
@@ -309,15 +335,23 @@ const cards = enrichedRoutes
       throw new Error('Offer not found or expired');
     }
 
+    const passengers = offer.passengers ?? 1;
+
     const providerRoute = offer.providerRoute;
-    const flights = providerRoute.Segments.flatMap(s => s.Flights);
+    const flights = providerRoute.Segments.flatMap(
+      (segment, segmentIndex) =>
+        segment.Flights.map(f => ({
+          ...f,
+          FlightGroup: segmentIndex,
+        })),
+    );
 
     /* =========================
         1️⃣ BrandFarePricing
     ========================= */
     const brandResp = await this.onelyaService.brandFarePricing({
       Gds: providerRoute.Gds,
-      AdultQuantity: 1,
+      AdultQuantity: passengers,
       ChildQuantity: 0,
       BabyWithoutPlaceQuantity: 0,
       BabyWithPlaceQuantity: 0,
@@ -332,7 +366,7 @@ const cards = enrichedRoutes
         ServiceClass: f.ServiceClass,
         ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
         FareCode: f.FareCode,
-        FlightGroup: f.RouteGroup,
+        FlightGroup: f.FlightGroup,
       })),
     });
 
@@ -351,10 +385,10 @@ const cards = enrichedRoutes
         ServiceClass: f.ServiceClass,
         ServiceSubclass: f.ServiceSubclass ?? f.Subclass,
         FareCode: f.FareCode,
-        FlightGroup: f.RouteGroup,
+        FlightGroup: f.FlightGroup,
       })),
       FlightIndex: 0,
-      AdultQuantity: 1,
+      AdultQuantity: passengers,
       ChildQuantity: 0,
       BabyWithoutPlaceQuantity: 0,
       BabyWithPlaceQuantity: 0,
@@ -570,4 +604,3 @@ const cards = enrichedRoutes
     return typeof value === 'number' ? value : 0;
   }
 }
-

@@ -63,6 +63,8 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
   const baseFare = fares[0];
   const selectedFare = fares[selectedFareIndex];
 
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
   /* ================= HELPERS ================= */
 
   const formatPrice = (v) =>
@@ -77,6 +79,14 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
     return diff > 0 ? `+${formatPrice(diff)}` : null;
   };
 
+  const outbound = flight.outbound;
+const inbound = flight.inbound;
+
+const routeText = inbound
+  ? `${outbound?.from} → ${outbound?.to} → ${inbound?.to}`
+  : `${outbound?.from} → ${outbound?.to}`;
+
+
   /* ================= RENDER ================= */
 
   return (
@@ -84,10 +94,25 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
 
       {/* ===== HEADER ===== */}
       <View style={styles.header}>
-        <Text style={styles.routeMain}>{flight.from} → {flight.to}</Text>
-        <Text style={styles.headerPrice}>
-          {formatPrice(selectedFare?.amount ?? flight.price)}
-        </Text>
+        <Text style={styles.routeMain}>{routeText}</Text>
+        <Animated.Text
+  style={[
+    styles.headerPrice,
+    {
+      opacity: fadeAnim,
+      transform: [
+        {
+          translateY: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [6, 0],
+          }),
+        },
+      ],
+    },
+  ]}
+>
+  {formatPrice(selectedFare?.amount ?? flight.price)}
+</Animated.Text>
 
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
           <MaterialCommunityIcons name="close" size={26} color="#333" />
@@ -118,7 +143,24 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
                   key={index}
                   style={[styles.fareCard, active && styles.fareActive]}
                   activeOpacity={0.9}
-                  onPress={() => setSelectedFareIndex(index)}
+                  onPress={() => {
+  Animated.sequence([
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 120,
+      useNativeDriver: true,
+      easing: Easing.out(Easing.quad),
+    }),
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+      easing: Easing.out(Easing.quad),
+    }),
+  ]).start();
+
+  setSelectedFareIndex(index);
+}}
                 >
                   <View style={styles.fareLeft}>
                     <View style={[styles.radio, active && styles.radioActive]}>
@@ -157,7 +199,22 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
         </View>
 
         {/* ===== CONTENT ===== */}
-        <View style={styles.infoCard}>
+        <Animated.View
+  style={[
+    styles.infoCard,
+    {
+      opacity: fadeAnim,
+      transform: [
+        {
+          translateY: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [8, 0],
+          }),
+        },
+      ],
+    },
+  ]}
+>
           {activeTab === 'info' && (
             <>
               <Row label="Багаж" value={safe(selectedFare?.baggage)} />
@@ -174,7 +231,7 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
               <Text style={styles.rulesText}>{safe(selectedFare?.exchange)}</Text>
             </>
           )}
-        </View>
+        </Animated.View>
 
         {/* ===== CONTINUE ===== */}
         <TouchableOpacity
@@ -182,27 +239,52 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
           onPress={() => {
             onClose?.();
                     
-            const payload = {
-              flight: {
-                ...flight,
-                price: selectedFare?.amount,
-                offerId: flight.offerId,
-                brandId: selectedFare?.brandId,
-              },
+            const outbound = flight.outbound;
+            const inbound = flight.inbound;
             
-                flightView: {
-                  from: flight.from,
-                  to: flight.to,
-                                
-                  // 🔥 ВОТ ОНИ, НАСТОЯЩИЕ ДАТЫ
-                  departureAt: flight.departTime,
-                  arrivalAt: flight.arrivalTime,
-                                
-                  cabinClass: flight.cabinClass,
-                  fareTitle: selectedFare?.title,
-                  price: selectedFare?.amount,
-                },
-            };
+            const payload = {
+  flight: {
+    ...flight,
+    price: selectedFare?.amount,
+    offerId: flight.offerId,
+    brandId: selectedFare?.brandId,
+  },
+
+  flightView: {
+    type: flight?.inbound ? 'roundtrip' : 'oneway',
+
+    from: outbound?.from,
+  to: outbound?.to,
+
+    outbound: flight?.outbound
+      ? {
+          from: flight.outbound.from,
+          to: flight.outbound.to,
+          departAt: flight.outbound.departTime,
+          arriveAt: flight.outbound.arrivalTime,
+          duration:
+            new Date(flight.outbound.arrivalTime) -
+            new Date(flight.outbound.departTime),
+        }
+      : null,
+
+    inbound: flight?.inbound
+      ? {
+          from: flight.inbound.from,
+          to: flight.inbound.to,
+          departAt: flight.inbound.departTime,
+          arriveAt: flight.inbound.arrivalTime,
+          duration:
+            new Date(flight.inbound.arrivalTime) -
+            new Date(flight.inbound.departTime),
+        }
+      : null,
+
+    cabinClass: flight?.cabinClass,
+    fareTitle: selectedFare?.title,
+    price: selectedFare?.amount,
+  },
+};
             if (!token) {
               navigation.navigate('Login', {
                 returnTo: 'PassengerInfo',
@@ -226,7 +308,9 @@ export default function FlightDetails({ route, navigation, flight: flightProp, o
 const Row = ({ label, value }) => (
   <View style={styles.row}>
     <Text style={styles.rowLabel}>{label}</Text>
-    <Text style={styles.rowValue}>{value}</Text>
+    <Text style={styles.rowValue} numberOfLines={0}>
+      {value}
+    </Text>
   </View>
 );
 
@@ -309,12 +393,25 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
-  rowLabel: { color: '#666' },
-  rowValue: { fontWeight: '600' },
+  flexDirection: 'row',
+  alignItems: 'flex-start',
+  paddingVertical: 8,
+},
+
+rowLabel: {
+  width: 120,
+  color: '#666',
+  fontSize: 14,
+},
+
+rowValue: {
+  flex: 1,
+  fontWeight: '600',
+  fontSize: 14,
+  lineHeight: 20,
+  textAlign: 'right',
+  flexWrap: 'wrap',
+},
 
   rulesText: { fontSize: 13, color: '#555', marginBottom: 8 },
 

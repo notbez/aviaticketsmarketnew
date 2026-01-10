@@ -24,35 +24,42 @@ export interface ReservationRecalcRequest {
   OrderId: number;
 }
 
-export interface ReservationRecalcResponse {
-  OrderId: number;
-
-  Prices?: Array<{
-    Amount?: number;
-    Currency?: string;
-    PassengerType?: string;
-  }>;
-
-  Price?: {
-    Amount?: number;
-    Currency?: string;
-  };
-
-  Total?: number;
-  Currency?: string;
-
-  // разрешаем остальные поля от Onelya
-  [key: string]: any;
+export interface AviaRecalcResult {
+  OrderItemId: number;
+  Amount: number;
+  Fare: number;
+  Tax: number;
+  ClientFeeCalculation?: {
+    Charge: number;
+    Profit: number;
+  } | null;
+  AgentFeeCalculation?: {
+    Charge: number;
+    Profit: number;
+  } | null;
 }
 
 export interface ReservationRecalcResponse {
   OrderId: number;
-  Customers: unknown[];
-  RecalcResults: unknown[];
+
+  Customers: Array<{
+    OrderCustomerId: number;
+  }>;
+
+  RecalcResults: AviaRecalcResult[];
+
   AmountBefore: number;
   AmountAfter: number;
-  ClientFeeCalculationBefore: unknown;
-  ClientFeeCalculationAfter: unknown;
+
+  ClientFeeCalculationBefore?: {
+    Charge: number;
+    Profit: number;
+  } | null;
+
+  ClientFeeCalculationAfter?: {
+    Charge: number;
+    Profit: number;
+  } | null;
 }
 
 export interface ReservationConfirmRequest {

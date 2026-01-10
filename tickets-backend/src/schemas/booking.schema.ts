@@ -128,6 +128,9 @@ bookingStatus:
   pdfUrl?: string;
 
   @Prop({ type: Object, default: {} })
+  flightView?: any;
+
+  @Prop({ type: Object, default: {} })
   rawProviderData?: any;
 
   createdAt?: Date;

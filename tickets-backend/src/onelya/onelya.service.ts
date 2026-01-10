@@ -91,12 +91,11 @@ function mapPassengerToOnelyaCustomer(p: any, index: number) {
 function assertValidProviderRaw(providerRaw: any) {
   if (
     !providerRaw ||
-    typeof providerRaw.RouteGroup !== 'number' ||
     !Array.isArray(providerRaw.Flights) ||
     providerRaw.Flights.length === 0
   ) {
     throw new HttpException(
-      'ProviderRaw must contain RouteGroup and Flights',
+      'ProviderRaw must contain Flights',
       400,
     );
   }
@@ -218,8 +217,18 @@ const flights = providerRaw.Flights.map(f => ({
 
   Tariff: f.Tariff ?? undefined,
   Gds: providerRaw.Gds,
-  RouteGroup: providerRaw.RouteGroup,
+  FlightGroup: f.FlightGroup,
 }));
+
+// 🔍 DEBUG: проверяем FlightGroup ПЕРЕД Reservation/Create
+this.logger.warn(
+  '[DEBUG][FLIGHT GROUPS BEFORE CREATE]',
+  flights.map(f => ({
+    flight: `${f.OriginAirportCode}-${f.DestinationAirportCode}`,
+    routeGroup: f.RouteGroup,
+    flightNumber: f.FlightNumber,
+  })),
+);
 
 
 const reservationItem = {
