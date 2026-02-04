@@ -2,11 +2,18 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import axios from 'axios';
 import { UsersService } from '../users/users.service';
 
+/**
+ * OAuth service for third-party authentication providers
+ * Handles Google, Yandex, and Mail.ru OAuth flows
+ * TODO: Add error handling for network failures and invalid tokens
+ */
 @Injectable()
 export class OauthService {
   constructor(private readonly usersService: UsersService) {}
 
-  // ---------- GOOGLE ----------
+  /**
+   * Google OAuth verification
+   */
   async verifyGoogleCode(code: string) {
     const tokenRes = await axios.post(
       `https://oauth2.googleapis.com/token`,
@@ -36,7 +43,9 @@ export class OauthService {
     };
   }
 
-  // ---------- YANDEX ----------
+  /**
+   * Yandex OAuth verification
+   */
   async verifyYandexCode(code: string) {
     const tokenRes = await axios.post(
       `https://oauth.yandex.ru/token`,
@@ -68,7 +77,9 @@ export class OauthService {
     };
   }
 
-  // ---------- MAIL.RU ----------
+  /**
+   * Mail.ru OAuth verification
+   */
   async verifyMailRuCode(code: string) {
     const tokenRes = await axios.post(
       'https://oauth.mail.ru/token',
@@ -97,7 +108,9 @@ export class OauthService {
     };
   }
 
-  // ---------- COMMON ----------
+  /**
+   * Find existing user by email or create new OAuth user
+   */
   async findOrCreateUserByEmail(profile: {
     email: string;
     firstName?: string;
@@ -105,17 +118,14 @@ export class OauthService {
     avatar?: string;
     provider: string;
   }) {
-
     if (!profile.email) {
       throw new BadRequestException('OAuth provider did not return an email');
     }
 
     let user = await this.usersService.findByEmail(profile.email);
 
-    // если юзер есть → просто логиним
     if (user) return user;
 
-    // если нет → создаем
     return await this.usersService.createOAuthUser({
       email: profile.email,
       firstName: profile.firstName,

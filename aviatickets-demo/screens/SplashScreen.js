@@ -3,9 +3,18 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+/**
+ * Application splash screen with branding and automatic navigation
+ * Displays app logo and transitions to main interface after delay
+ * TODO: Add app version display and update check
+ * TODO: Implement dynamic splash screen based on user state
+ */
 export default function SplashScreen() {
   const navigation = useNavigation();
 
+  /**
+   * Auto-navigate to main tabs after splash delay
+   */
   useEffect(() => {
     const timer = setTimeout(() => {
       navigation.replace('MainTabs');

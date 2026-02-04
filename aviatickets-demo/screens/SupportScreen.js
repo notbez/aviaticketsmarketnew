@@ -1,4 +1,3 @@
-// screens/SupportScreen.js
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -17,6 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 
+/**
+ * Support chat screen with real-time messaging functionality
+ * Provides direct communication with customer support team
+ * TODO: Add file attachment support
+ * TODO: Implement typing indicators
+ * TODO: Add message status indicators (sent, delivered, read)
+ */
 export default function SupportScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -26,20 +32,27 @@ export default function SupportScreen({ navigation }) {
   const [sending, setSending] = useState(false);
   const scrollViewRef = useRef(null);
 
+  /**
+   * Initialize message loading and auto-refresh
+   */
   useEffect(() => {
     loadMessages();
-    // Auto-refresh every 5 seconds
     const interval = setInterval(loadMessages, 5000);
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Auto-scroll to bottom when new messages arrive
+   */
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
 
+  /**
+   * Load messages from support API
+   */
   const loadMessages = async () => {
     if (!token) return;
 
@@ -53,6 +66,9 @@ export default function SupportScreen({ navigation }) {
     }
   };
 
+  /**
+   * Send message to support team
+   */
   const sendMessage = async () => {
     if (!inputText.trim() || !token) return;
 
@@ -74,6 +90,9 @@ export default function SupportScreen({ navigation }) {
     }
   };
 
+  /**
+   * Format message timestamp for display
+   */
   const formatTime = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -138,7 +157,7 @@ export default function SupportScreen({ navigation }) {
               const showTime =
                 index === 0 ||
                 new Date(msg.createdAt) - new Date(messages[index - 1].createdAt) >
-                  300000; // 5 minutes
+                  300000;
 
               return (
                 <View key={msg._id || msg.id || index}>

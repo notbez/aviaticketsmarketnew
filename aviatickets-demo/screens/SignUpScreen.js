@@ -1,4 +1,3 @@
-// screens/SignUpScreen.js
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -21,35 +20,35 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-
-/* ================= CONST (КАК В PassengerInfoScreen) ================= */
-
 const COUNTRIES = [
   { label: 'Россия', value: 'RU' },
   { label: 'Узбекистан', value: 'UZ' },
 ];
 
-/* ================= HELPERS ================= */
-
+/**
+ * Format date to ISO string (YYYY-MM-DD)
+ */
 const formatISO = (d) => d.toISOString().split('T')[0];
 
+/**
+ * Format ISO date to human readable format (DD.MM.YYYY)
+ */
 const formatHuman = (iso) => {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y}`;
 };
 
-
+/**
+ * Format phone number for Russian format display
+ */
 const formatPhoneRU = (value = '') => {
-  // оставляем только цифры
   let digits = value.replace(/\D/g, '');
 
-  // если начали с 8 — заменяем на 7
   if (digits.startsWith('8')) {
     digits = '7' + digits.slice(1);
   }
 
-  // если ввели без кода — считаем что это РФ
   if (digits.length && !digits.startsWith('7')) {
     digits = '7' + digits;
   }
@@ -74,44 +73,55 @@ const formatPhoneRU = (value = '') => {
   return formatted;
 };
 
+/**
+ * Normalize phone number to clean format
+ */
 const normalizePhoneRU = (value = '') =>
   '+' + value.replace(/\D/g, '').slice(0, 11);
-/* ================= SCREEN ================= */
 
+/**
+ * User registration screen with form validation and document data collection
+ * Handles user signup with passport information and terms acceptance
+ * TODO: Add email verification flow
+ * TODO: Implement phone number verification via SMS
+ * TODO: Add password strength indicator
+ */
 export default function SignUpScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { login, user } = useAuth();
   const { returnTo, params } = route.params || {};
 
-  /* ===== STATE ===== */
   const [lastName, setLastName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
-
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-
   const [documentNumber, setDocumentNumber] = useState('');
   const [documentCountry, setDocumentCountry] = useState('');
   const [documentExpiryDate, setDocumentExpiryDate] = useState('');
-
   const [picker, setPicker] = useState(null);
   const [dropdown, setDropdown] = useState(null);
-
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [notificationsAccepted, setNotificationsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  /* ===== VALIDATION ===== */
+  /**
+   * Validate email format
+   */
   const validateEmail = (email) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+  /**
+   * Validate phone number length
+   */
   const validatePhone = (phone) =>
     phone.replace(/\D/g, '').length >= 10;
 
-  /* ===== SUBMIT ===== */
+  /**
+   * Handle user registration with validation
+   */
   const handleSignUp = async () => {
     if (!lastName.trim() || !firstName.trim()) {
       Alert.alert('Ошибка', 'Введите фамилию и имя');
@@ -161,19 +171,17 @@ export default function SignUpScreen({ route, navigation }) {
 
       await login(data.accessToken, data.user);
 
-    if (returnTo) {
-      navigation.replace(returnTo, params);
-    } else {
-      navigation.replace('MainTabs');
-    }
+      if (returnTo) {
+        navigation.replace(returnTo, params);
+      } else {
+        navigation.replace('MainTabs');
+      }
     } catch (e) {
       Alert.alert('Ошибка', e.message || 'Не удалось зарегистрироваться');
     } finally {
       setLoading(false);
     }
   };
-
-  /* ================= UI ================= */
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -182,7 +190,6 @@ export default function SignUpScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-          {/* HEADER */}
           <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
             <View style={styles.logo}>
               <MaterialCommunityIcons name="airplane" size={28} color="#0277bd" />
@@ -237,7 +244,6 @@ export default function SignUpScreen({ route, navigation }) {
           </View>
         </ScrollView>
 
-        {/* DATE PICKER */}
         {picker && Platform.OS === 'android' && (
           <DateTimePicker
             value={picker.value ? new Date(picker.value) : new Date()}
@@ -292,8 +298,9 @@ export default function SignUpScreen({ route, navigation }) {
   );
 }
 
-/* ================= SELECT + DROPDOWN (ОДИН В ОДИН) ================= */
-
+/**
+ * Dropdown select component
+ */
 const Select = ({ label, value, onPress }) => {
   const ref = useRef(null);
 
@@ -320,6 +327,9 @@ const Select = ({ label, value, onPress }) => {
   );
 };
 
+/**
+ * Animated dropdown menu component
+ */
 const Dropdown = ({ y, options, onSelect, onClose }) => {
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -367,8 +377,6 @@ const Dropdown = ({ y, options, onSelect, onClose }) => {
     </TouchableOpacity>
   );
 };
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

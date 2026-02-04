@@ -1,4 +1,3 @@
-// screens/ResultsScreen.js
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -21,21 +20,25 @@ import FlightDetails from '../components/FlightDetails';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const SHEET_HEIGHT = SCREEN_HEIGHT * 0.75;
 
+/**
+ * Flight search results screen with detailed flight information modal
+ * Displays search results and provides flight selection functionality
+ * TODO: Add flight filtering and sorting options
+ * TODO: Implement flight comparison feature
+ */
 export default function ResultsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const route = useRoute();
 
   const {
-  results = [],
-  from,
-  to,
-  fromName,
-  toName,
-  noResults,
-  message,
-} = route.params || {};
-
-  /* ===== MODAL ===== */
+    results = [],
+    from,
+    to,
+    fromName,
+    toName,
+    noResults,
+    message,
+  } = route.params || {};
 
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [selectedFlight, setSelectedFlight] = useState(null);
@@ -49,13 +52,15 @@ export default function ResultsScreen({ navigation }) {
 
   const closingRef = useRef(false);
 
-  /* ===== HELPERS ===== */
-
+  /**
+   * Extract city name from full airport name
+   */
   const cityName = (code, name) =>
     name ? name.split('(')[0].trim() : code;
 
-  /* ===== OPEN / CLOSE ===== */
-
+  /**
+   * Open flight details modal with animation
+   */
   const openDetails = (flight) => {
     closingRef.current = false;
     setSelectedFlight(flight);
@@ -69,6 +74,9 @@ export default function ResultsScreen({ navigation }) {
     }).start();
   };
 
+  /**
+   * Close flight details modal with animation
+   */
   const closeDetails = () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -84,8 +92,9 @@ export default function ResultsScreen({ navigation }) {
     });
   };
 
-  /* ===== SWIPE ===== */
-
+  /**
+   * Handle swipe gestures for modal dismissal
+   */
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, g) => g.dy > 8,
@@ -102,11 +111,11 @@ export default function ResultsScreen({ navigation }) {
     })
   ).current;
 
-  /* ===== HEADER (SCROLLABLE) ===== */
-
+  /**
+   * Render list header with navigation and route info
+   */
   const ListHeader = () => (
     <View style={{ paddingTop: insets.top + 10 }}>
-      {/* TOP BAR */}
       <View style={styles.topBar}>
         <TouchableOpacity onPress={navigation.goBack} style={styles.back}>
           <MaterialIcons name="arrow-back" size={24} />
@@ -115,7 +124,6 @@ export default function ResultsScreen({ navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* ROUTE */}
       <View style={styles.routeCard}>
         <Text
           style={styles.city}
@@ -138,50 +146,51 @@ export default function ResultsScreen({ navigation }) {
         </Text>
       </View>
 
-      {/* COUNT */}
       <Text style={styles.countText}>
         Найдено вариантов: <Text style={styles.countBold}>{results.length}</Text>
       </Text>
     </View>
   );
 
-  /* ===== RENDER ===== */
+  /**
+   * Render no results state
+   */
   if (noResults) {
-  return (
-    <SafeAreaView
-      style={[
-        styles.safe,
-        { justifyContent: 'center', alignItems: 'center' },
-      ]}
-    >
-      <MaterialIcons name="search-off" size={64} color="#ccc" />
-
-      <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '700' }}>
-        Рейсы не найдены
-      </Text>
-
-      <Text
-        style={{
-          marginTop: 8,
-          fontSize: 14,
-          color: '#666',
-          textAlign: 'center',
-        }}
+    return (
+      <SafeAreaView
+        style={[
+          styles.safe,
+          { justifyContent: 'center', alignItems: 'center' },
+        ]}
       >
-        {message || 'Попробуйте изменить параметры поиска'}
-      </Text>
+        <MaterialIcons name="search-off" size={64} color="#ccc" />
 
-      <TouchableOpacity
-        style={{ marginTop: 24 }}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={{ color: '#0277bd', fontWeight: '700' }}>
-          Изменить поиск
+        <Text style={{ marginTop: 16, fontSize: 16, fontWeight: '700' }}>
+          Рейсы не найдены
         </Text>
-      </TouchableOpacity>
-    </SafeAreaView>
-  );
-}
+
+        <Text
+          style={{
+            marginTop: 8,
+            fontSize: 14,
+            color: '#666',
+            textAlign: 'center',
+          }}
+        >
+          {message || 'Попробуйте изменить параметры поиска'}
+        </Text>
+
+        <TouchableOpacity
+          style={{ marginTop: 24 }}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={{ color: '#0277bd', fontWeight: '700' }}>
+            Изменить поиск
+          </Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -199,7 +208,6 @@ export default function ResultsScreen({ navigation }) {
         )}
       />
 
-      {/* OVERLAY + SHEET */}
       {detailsVisible && (
         <>
           <Animated.View
@@ -245,8 +253,6 @@ export default function ResultsScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

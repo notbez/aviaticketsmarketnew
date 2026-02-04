@@ -1,5 +1,3 @@
-
-// screens/TicketsScreen.js
 import React, { useEffect, useState } from 'react';
 import {
   SafeAreaView,
@@ -17,7 +15,13 @@ import { api } from '../lib/api';
 import { normalizeFlightView } from '../utils/normalizeFlightView';
 import { getFlightView } from '../stores/FlightViewStore';
 
-
+/**
+ * User tickets screen displaying booked flights and travel history
+ * Shows flight details with departure/arrival times and booking status
+ * TODO: Add ticket filtering by status (active, completed, cancelled)
+ * TODO: Implement ticket sharing and export functionality
+ * TODO: Add offline ticket storage for no-network access
+ */
 export default function TicketsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -30,119 +34,67 @@ export default function TicketsScreen({ navigation }) {
     }
   }, [token]);
 
-const loadOrders = async () => {
-  try {
-    setLoading(true);
-    const data = await api('/booking');
+  /**
+   * Load user bookings with flight details enrichment
+   */
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await api('/booking');
 
-    const enriched = await Promise.all(
-      (data || []).map(async (b) => {
-        try {
-          const full = await api(`/booking/${b._id}`);
+      const enriched = await Promise.all(
+        (data || []).map(async (b) => {
+          try {
+            const full = await api(`/booking/${b._id}`);
 
-          return {
-            orderId: b._id,
-            bookingStatus: b.bookingStatus,
-            flightView:
-              getFlightView(b._id) || full.flightView,
-          };
-        } catch {
-          return {
-            orderId: b._id,
-            bookingStatus: b.bookingStatus,
-            flightView: null,
-          };
-        }
-      })
-    );
+            return {
+              orderId: b._id,
+              bookingStatus: b.bookingStatus,
+              flightView: getFlightView(b._id) || full.flightView,
+            };
+          } catch {
+            return {
+              orderId: b._id,
+              bookingStatus: b.bookingStatus,
+              flightView: null,
+            };
+          }
+        })
+      );
 
-    setOrders(enriched);
-  } catch (e) {
-    console.error('Load bookings error:', e);
-  } finally {
-    setLoading(false);
-  }
-};
+      setOrders(enriched);
+    } catch (e) {
+      console.error('Load bookings error:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Render individual ticket card with flight information
+   */
   const renderOrder = (order) => {
-  console.log('RAW flightView:', order.flightView);
-  const fv = normalizeFlightView(order.flightView);
-  console.log('NORMALIZED fv:', fv);
+    const fv = normalizeFlightView(order.flightView);
 
-  return (
-    <View key={order.orderId} style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.cardHeader}>
-        <View style={styles.airlineIcon}>
-          <MaterialIcons name="flight" size={22} color="#0277bd" />
-        </View>
-        <View>
-          <Text style={styles.airlineName}>
-            ONELYA AIR
-          </Text>
-          <Text style={styles.orderId}>
-            Заказ № {order.orderId.slice(0, 8)}
-          </Text>
-        </View>
-      </View>
-
-      {/* ROUTE */}
-      <View style={styles.route}>
-        <View style={styles.cityBlock}>
-          <Text style={styles.time}>
-            {fv?.outbound?.departAt
-            ? new Date(fv.outbound.departAt).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })
-            : '—'}
-          </Text>
-          <Text style={styles.city}>{fv?.from || '—'}</Text>
+    return (
+      <View key={order.orderId} style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.airlineIcon}>
+            <MaterialIcons name="flight" size={22} color="#0277bd" />
+          </View>
+          <View>
+            <Text style={styles.airlineName}>ONELYA AIR</Text>
+            <Text style={styles.orderId}>
+              Заказ № {order.orderId.slice(0, 8)}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.middle}>
-          <MaterialIcons name="flight" size={16} color="#0277bd" />
-          <View style={styles.line} />
-          <Text style={styles.duration}>В пути</Text>
-        </View>
-
-        <View style={styles.cityBlock}>
-          <Text style={styles.time}>
-            {fv?.outbound?.arriveAt
-              ? new Date(fv.outbound.arriveAt).toLocaleTimeString('ru-RU', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
-              : '—'}
-          </Text>
-          <Text style={styles.city}>{fv?.to || '—'}</Text>
-        </View>
-      </View>
-
-      {/* ROUTE — INBOUND */}
-      {fv?.inbound && (
         <View style={styles.route}>
           <View style={styles.cityBlock}>
             <Text style={styles.time}>
-              {fv.inbound.departAt
-                ? new Date(fv.inbound.departAt).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '—'}
-            </Text>
-            <Text style={styles.city}>{fv?.to || '—'}</Text>
-          </View>
-                
-          <View style={styles.middle}>
-            <MaterialIcons name="flight" size={16} color="#0277bd" />
-            <View style={styles.line} />
-            <Text style={styles.duration}>В пути</Text>
-          </View>
-                
-          <View style={styles.cityBlock}>
-            <Text style={styles.time}>
-              {fv.inbound.arriveAt
-                ? new Date(fv.inbound.arriveAt).toLocaleTimeString('ru-RU', {
+              {fv?.outbound?.departAt
+                ? new Date(fv.outbound.departAt).toLocaleTimeString('ru-RU', {
                     hour: '2-digit',
                     minute: '2-digit',
                   })
@@ -150,23 +102,73 @@ const loadOrders = async () => {
             </Text>
             <Text style={styles.city}>{fv?.from || '—'}</Text>
           </View>
-        </View>
-      )}
 
-      {/* ACTION */}
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        onPress={() =>
-          navigation.navigate('TicketDetails', {
-            bookingId: order.orderId,
-          })
-        }
-      >
-        <Text style={styles.primaryText}>Открыть билет</Text>
-      </TouchableOpacity>
-    </View>
-  );
-};
+          <View style={styles.middle}>
+            <MaterialIcons name="flight" size={16} color="#0277bd" />
+            <View style={styles.line} />
+            <Text style={styles.duration}>В пути</Text>
+          </View>
+
+          <View style={styles.cityBlock}>
+            <Text style={styles.time}>
+              {fv?.outbound?.arriveAt
+                ? new Date(fv.outbound.arriveAt).toLocaleTimeString('ru-RU', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : '—'}
+            </Text>
+            <Text style={styles.city}>{fv?.to || '—'}</Text>
+          </View>
+        </View>
+
+        {fv?.inbound && (
+          <View style={styles.route}>
+            <View style={styles.cityBlock}>
+              <Text style={styles.time}>
+                {fv.inbound.departAt
+                  ? new Date(fv.inbound.departAt).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '—'}
+              </Text>
+              <Text style={styles.city}>{fv?.to || '—'}</Text>
+            </View>
+
+            <View style={styles.middle}>
+              <MaterialIcons name="flight" size={16} color="#0277bd" />
+              <View style={styles.line} />
+              <Text style={styles.duration}>В пути</Text>
+            </View>
+
+            <View style={styles.cityBlock}>
+              <Text style={styles.time}>
+                {fv.inbound.arriveAt
+                  ? new Date(fv.inbound.arriveAt).toLocaleTimeString('ru-RU', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : '—'}
+              </Text>
+              <Text style={styles.city}>{fv?.from || '—'}</Text>
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.primaryBtn}
+          onPress={() =>
+            navigation.navigate('TicketDetails', {
+              bookingId: order.orderId,
+            })
+          }
+        >
+          <Text style={styles.primaryText}>Открыть билет</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -192,8 +194,6 @@ const loadOrders = async () => {
     </SafeAreaView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

@@ -114,7 +114,6 @@ bookingStatus:
   @Prop({ default: null })
   providerBookingId?: string;
 
-  // Additional info
   @Prop()
   seat?: string;
 
@@ -139,7 +138,6 @@ bookingStatus:
 
 export const BookingSchema = SchemaFactory.createForClass(Booking);
 
-// Indexes
 BookingSchema.index({ user: 1, createdAt: -1 });
 BookingSchema.index({ providerBookingId: 1 });
 BookingSchema.index({ 'payment.paymentStatus': 1 });

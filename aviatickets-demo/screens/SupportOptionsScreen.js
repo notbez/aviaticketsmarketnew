@@ -1,4 +1,3 @@
-// screens/SupportOptionsScreen.js
 import React from 'react';
 import {
   SafeAreaView,
@@ -11,12 +10,17 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/**
+ * Support options screen with navigation to different help resources
+ * Provides access to FAQ and direct support contact options
+ * TODO: Add live chat integration
+ * TODO: Implement support ticket tracking system
+ */
 export default function SupportOptionsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} color="#000" />
@@ -31,7 +35,6 @@ export default function SupportOptionsScreen({ navigation }) {
           { paddingBottom: 32 + insets.bottom },
         ]}
       >
-        {/* INTRO */}
         <View style={styles.intro}>
           <MaterialCommunityIcons
             name="lifebuoy"
@@ -43,7 +46,6 @@ export default function SupportOptionsScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* OPTIONS */}
         <View style={styles.card}>
           <SupportItem
             icon={
@@ -78,8 +80,9 @@ export default function SupportOptionsScreen({ navigation }) {
   );
 }
 
-/* ===== UI COMPONENT ===== */
-
+/**
+ * Reusable support option item component
+ */
 const SupportItem = ({ icon, title, description, onPress }) => (
   <TouchableOpacity style={styles.item} onPress={onPress}>
     <View style={styles.itemIcon}>{icon}</View>
@@ -96,8 +99,6 @@ const SupportItem = ({ icon, title, description, onPress }) => (
     />
   </TouchableOpacity>
 );
-
-/* ===== STYLES ===== */
 
 const styles = StyleSheet.create({
   safe: {

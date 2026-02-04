@@ -1,4 +1,3 @@
-// screens/SettingsScreen.js
 import React from 'react';
 import {
   SafeAreaView,
@@ -11,9 +10,18 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/**
+ * Application settings screen with navigation to various configuration options
+ * Provides access to notifications, legal information, and other app settings
+ * TODO: Add theme selection and language preferences
+ * TODO: Implement data usage and privacy controls
+ */
 export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
+  /**
+   * Reusable settings card component
+   */
   const Card = ({ icon, title, onPress }) => (
     <TouchableOpacity
       activeOpacity={0.85}
@@ -34,7 +42,6 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} />

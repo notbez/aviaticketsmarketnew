@@ -1,4 +1,3 @@
-// screens/LoginScreen.js
 import React, { useState } from 'react';
 import {
   View,
@@ -24,66 +23,70 @@ import {
   startMailRuAuth,
 } from '../services/authProviders';
 
+/**
+ * Login screen with email/phone authentication and social login options
+ * Supports Apple, Google, Yandex, and Mail.ru OAuth providers
+ * TODO: Add biometric authentication support
+ * TODO: Implement remember me functionality
+ */
 export default function LoginScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { login } = useAuth();
 
-  /* ===== STATE (НЕ МЕНЯЛИ) ===== */
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [identifier, setIdentifier] = useState('');
 
-  const REDIRECT_URI = AuthSession.makeRedirectUri({ useProxy: true });
-
-  /* ===== LOGIN ===== */
+  /**
+   * Handle email/phone login with validation
+   */
   const handleSignIn = async () => {
-  if (!identifier.trim() || !password.trim()) {
-    Alert.alert('Ошибка', 'Заполните все поля');
-    return;
-  }
-
-  if (password.length < 6) {
-    Alert.alert('Ошибка', 'Пароль должен быть не менее 6 символов');
-    return;
-  }
-
-  const value = identifier.trim();
-  const isEmail = value.includes('@');
-
-  const payload = {
-    password,
-    ...(isEmail
-      ? { email: value.toLowerCase() }
-      : { phone: value }),
-  };
-
-  setLoading(true);
-
-  try {
-    const data = await api('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-
-    if (!data.accessToken || !data.user) {
-      throw new Error('Некорректный ответ от сервера');
+    if (!identifier.trim() || !password.trim()) {
+      Alert.alert('Ошибка', 'Заполните все поля');
+      return;
     }
 
-    await login(data.accessToken, data.user);
+    if (password.length < 6) {
+      Alert.alert('Ошибка', 'Пароль должен быть не менее 6 символов');
+      return;
+    }
 
-    const { returnTo, params } = route.params || {};
+    const value = identifier.trim();
+    const isEmail = value.includes('@');
 
-    returnTo
-      ? navigation.replace(returnTo, params)
-      : navigation.replace('MainTabs');
-  } catch (e) {
-    Alert.alert('Ошибка', e.message || 'Не удалось войти');
-  } finally {
-    setLoading(false);
-  }
-};
+    const payload = {
+      password,
+      ...(isEmail ? { email: value.toLowerCase() } : { phone: value }),
+    };
 
-  /* ===== APPLE ===== */
+    setLoading(true);
+
+    try {
+      const data = await api('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (!data.accessToken || !data.user) {
+        throw new Error('Некорректный ответ от сервера');
+      }
+
+      await login(data.accessToken, data.user);
+
+      const { returnTo, params } = route.params || {};
+      returnTo
+        ? navigation.replace(returnTo, params)
+        : navigation.replace('MainTabs');
+    } catch (e) {
+      Alert.alert('Ошибка', e.message || 'Не удалось войти');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle Apple Sign In authentication
+   */
   const handleAppleAuth = async () => {
     try {
       const credential = await AppleAuthentication.signInAsync({
@@ -110,12 +113,7 @@ export default function LoginScreen({ route, navigation }) {
           });
 
           await login(data.accessToken, data.user);
-
-          if (route.params?.returnTo === 'Booking') {
-            navigation.navigate('Booking', route.params.bookingData);
-          } else {
-            navigation.replace('MainTabs');
-          }
+          handlePostAuthNavigation();
         } finally {
           setLoading(false);
         }
@@ -127,13 +125,15 @@ export default function LoginScreen({ route, navigation }) {
     }
   };
 
-  /* ===== SOCIAL ===== */
-  const handleGoogleAuth = async () => {
+  /**
+   * Handle social authentication for OAuth providers
+   */
+  const handleSocialAuth = async (provider, authFunction, endpoint) => {
     try {
-      const res = await startGoogleAuth();
+      const res = await authFunction();
       if (res.type !== 'success') return;
 
-      const data = await api('/auth/google', {
+      const data = await api(endpoint, {
         method: 'POST',
         body: JSON.stringify({
           code: res.params.code,
@@ -142,68 +142,30 @@ export default function LoginScreen({ route, navigation }) {
       });
 
       await login(data.accessToken, data.user);
-
-      const { returnTo, params } = route.params || {};
-
-      returnTo
-        ? navigation.replace(returnTo, params)
-        : navigation.replace('MainTabs');
+      handlePostAuthNavigation();
     } catch {
-      Alert.alert('Ошибка', 'Google авторизация не удалась');
+      Alert.alert('Ошибка', `${provider} авторизация не удалась`);
     }
   };
 
-  const handleYandexAuth = async () => {
-    try {
-      const res = await startYandexAuth();
-      if (res.type !== 'success') return;
-
-      const data = await api('/auth/yandex', {
-        method: 'POST',
-        body: JSON.stringify({
-          code: res.params.code,
-          redirectUri: res.redirectUri,
-        }),
-      });
-
-      await login(data.accessToken, data.user);
-
-      const { returnTo, params } = route.params || {};
-
+  /**
+   * Navigate to appropriate screen after successful authentication
+   */
+  const handlePostAuthNavigation = () => {
+    const { returnTo, params } = route.params || {};
     returnTo
       ? navigation.replace(returnTo, params)
       : navigation.replace('MainTabs');
-    } catch {
-      Alert.alert('Ошибка', 'Yandex авторизация не удалась');
-    }
   };
 
-  const handleMailRuAuth = async () => {
-    try {
-      const res = await startMailRuAuth();
-      if (res.type !== 'success') return;
+  const handleGoogleAuth = () =>
+    handleSocialAuth('Google', startGoogleAuth, '/auth/google');
 
-      const data = await api('/auth/mail', {
-        method: 'POST',
-        body: JSON.stringify({
-          code: res.params.code,
-          redirectUri: res.redirectUri,
-        }),
-      });
+  const handleYandexAuth = () =>
+    handleSocialAuth('Yandex', startYandexAuth, '/auth/yandex');
 
-      await login(data.accessToken, data.user);
-
-      const { returnTo, params } = route.params || {};
-
-      returnTo
-        ? navigation.replace(returnTo, params)
-        : navigation.replace('MainTabs');
-    } catch {
-      Alert.alert('Ошибка', 'Mail авторизация не удалась');
-    }
-  };
-
-  /* ================= UI ================= */
+  const handleMailRuAuth = () =>
+    handleSocialAuth('Mail', startMailRuAuth, '/auth/mail');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -295,7 +257,7 @@ export default function LoginScreen({ route, navigation }) {
   );
 }
 
-/* ================= STYLES ================= */
+
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

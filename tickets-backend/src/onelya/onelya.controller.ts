@@ -27,15 +27,21 @@ import {
 } from './dto/order-reservation.dto';
 import { Response } from 'express';
 
+/**
+ * Onelya API proxy controller
+ * Provides direct access to Onelya flight booking API endpoints
+ * TODO: Add rate limiting and request/response caching for better performance
+ */
 @Controller('onelya')
 @UseInterceptors(OnelyaLoggingInterceptor)
 export class OnelyaController {
   constructor(private readonly onelyaService: OnelyaService) {}
 
+  /**
+   * Flight search and pricing endpoints
+   */
   @Post('avia/search/route-pricing')
-  routePricing(
-    @Body() body: RoutePricingRequest,
-  ): Promise<any> {
+  routePricing(@Body() body: RoutePricingRequest): Promise<any> {
     return this.onelyaService.routePricing(body);
   }
 
@@ -58,10 +64,11 @@ export class OnelyaController {
     return this.onelyaService.brandFarePricing(body);
   }
 
+  /**
+   * Reservation management endpoints
+   */
   @Post('order/reservation/create')
-  createReservation(
-    @Body() body: ReservationCreateRequest,
-  ): Promise<any> {
+  createReservation(@Body() body: ReservationCreateRequest): Promise<any> {
     return this.onelyaService.createReservation(body);
   }
 
@@ -73,12 +80,13 @@ export class OnelyaController {
   }
 
   @Post('order/reservation/confirm')
-  confirmReservation(
-    @Body() body: ReservationConfirmRequest,
-  ): Promise<any> {
+  confirmReservation(@Body() body: ReservationConfirmRequest): Promise<any> {
     return this.onelyaService.confirmReservation(body);
   }
 
+  /**
+   * Document generation endpoint - returns PDF buffer with proper headers
+   */
   @Post('order/reservation/blank')
   async blankReservation(
     @Body() body: ReservationBlankRequest,
@@ -93,6 +101,9 @@ export class OnelyaController {
     return result.buffer;
   }
 
+  /**
+   * Reservation cancellation endpoints
+   */
   @Post('order/reservation/void')
   voidReservation(
     @Body() body: ReservationVoidRequest,
@@ -105,6 +116,9 @@ export class OnelyaController {
     return this.onelyaService.cancelReservation(body);
   }
 
+  /**
+   * Order information endpoints
+   */
   @Post('order/info/order-info')
   orderInfo(@Body() body: OrderInfoRequest) {
     return this.onelyaService.orderInfo(body);
@@ -115,4 +129,3 @@ export class OnelyaController {
     return this.onelyaService.orderList(body);
   }
 }
-

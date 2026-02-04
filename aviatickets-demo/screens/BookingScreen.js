@@ -1,4 +1,3 @@
-// screens/BookingScreen.js
 import React, { useState, useMemo } from 'react';
 import {
   SafeAreaView,
@@ -9,15 +8,16 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
-import { Modal } from 'react-native';
 
-/* ================= HELPERS ================= */
-
+/**
+ * Date and time formatting utilities
+ */
 const formatDate = (iso) => {
   if (!iso) return '-';
   return new Date(iso).toLocaleDateString('ru-RU', {
@@ -44,7 +44,6 @@ const calcDuration = (from, to) => {
   return `${h} ч ${m} мин`;
 };
 
-
 const formatBirthDate = (iso) => {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -62,8 +61,11 @@ const formatExpiryDate = (iso) => {
 const formatName = (p) =>
   [p.lastName, p.firstName, p.middleName].filter(Boolean).join(' ');
 
-/* ================= SCREEN ================= */
-
+/**
+ * Booking confirmation screen with flight details and passenger information
+ * Handles booking creation and navigation to payment
+ * TODO: Add booking modification and cancellation options
+ */
 export default function BookingScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token } = useAuth();
@@ -71,48 +73,47 @@ export default function BookingScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [passengersVisible, setPassengersVisible] = useState(false);
 
-  /* ===== SAFE VIEW (ТОЛЬКО ДЛЯ UI) ===== */
-const view = flightView ?? {
-  type: flight?.inbound ? 'roundtrip' : 'oneway',
+  /**
+   * Safe view data for UI display
+   */
+  const view = flightView ?? {
+    type: flight?.inbound ? 'roundtrip' : 'oneway',
+    from: flight?.from,
+    to: flight?.to,
+    departureAt: flight?.outbound?.departTime,
+    arrivalAt: flight?.outbound?.arrivalTime,
+    outbound: flight?.outbound
+      ? {
+          from: flight.from,
+          to: flight.to,
+          departAt: flight.outbound.departTime,
+          arriveAt: flight.outbound.arrivalTime,
+          duration: calcDuration(
+            flight.outbound.departTime,
+            flight.outbound.arrivalTime,
+          ),
+        }
+      : null,
+    inbound: flight?.inbound
+      ? {
+          from: flight.to,
+          to: flight.from,
+          departAt: flight.inbound.departTime,
+          arriveAt: flight.inbound.arrivalTime,
+          duration: calcDuration(
+            flight.inbound.departTime,
+            flight.inbound.arrivalTime,
+          ),
+        }
+      : null,
+    cabinClass: flight?.cabinClass,
+    fareTitle: flight?.fareTitle,
+    price: flight?.price,
+  };
 
-  from: flight?.from,
-  to: flight?.to,
-
-  departureAt: flight?.outbound?.departTime,
-  arrivalAt: flight?.outbound?.arrivalTime,
-
-  outbound: flight?.outbound
-    ? {
-        from: flight.from,
-        to: flight.to,
-        departAt: flight.outbound.departTime,
-        arriveAt: flight.outbound.arrivalTime,
-        duration: calcDuration(
-          flight.outbound.departTime,
-          flight.outbound.arrivalTime,
-        ),
-      }
-    : null,
-
-  inbound: flight?.inbound
-    ? {
-        from: flight.to,
-        to: flight.from,
-        departAt: flight.inbound.departTime,
-        arriveAt: flight.inbound.arrivalTime,
-        duration: calcDuration(
-          flight.inbound.departTime,
-          flight.inbound.arrivalTime,
-        ),
-      }
-    : null,
-
-  cabinClass: flight?.cabinClass,
-  fareTitle: flight?.fareTitle,
-  price: flight?.price,
-};
-
-  /* ===== FLIGHT DTO (НЕ МЕНЯЕМ ЛОГИКУ) ===== */
+  /**
+   * Flight data transfer object for API calls
+   */
   const flightDTO = useMemo(() => {
     if (!flight) return null;
     return {
@@ -120,10 +121,7 @@ const view = flightView ?? {
       to: flight.to,
       departureAt: flight.departureAt,
       arrivalAt: flight.arrivalAt,
-      duration: calcDuration(
-        flight.departureAt,
-        flight.arrivalAt
-      ),
+      duration: calcDuration(flight.departureAt, flight.arrivalAt),
       cabinClass: flight.cabinClass || 'Эконом',
       fareTitle: flight.selectedFareTitle,
       price: flight.price,
@@ -141,6 +139,9 @@ const view = flightView ?? {
     );
   }
 
+  /**
+   * Create booking and navigate to payment
+   */
   const book = async () => {
     if (!token) {
       Alert.alert('Ошибка', 'Необходима авторизация');
@@ -169,7 +170,8 @@ const view = flightView ?? {
       const booking = response?.booking || response;
 
       if (!booking?._id) {
-        throw new Error('Booking ID not returned');
+        console.log('[BOOKING RAW RESPONSE]', response);
+        throw new Error('Бронирование не создано у провайдера');
       }
 
       navigation.navigate('Payment', {
@@ -187,7 +189,6 @@ const view = flightView ?? {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER — НЕ ТРОГАЕМ */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} />
@@ -203,102 +204,100 @@ const view = flightView ?? {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ===== FLIGHT CARD ===== */}
         <View style={styles.flightCard}>
           <Text style={styles.route}>
-  {flight?.inbound
-    ? `${view.from || '-'} → ${view.to || '-'} → ${view.from || '-'}`
-    : `${view.from || '-'} → ${view.to || '-'}`}
-</Text>
+            {flight?.inbound
+              ? `${view.from || '-'} → ${view.to || '-'} → ${view.from || '-'}`
+              : `${view.from || '-'} → ${view.to || '-'}`}
+          </Text>
 
           <Text style={styles.date}>
             {formatDate(view.departureAt)}
           </Text>
 
-          {/* ===== TIME ===== */}
-{flight?.outbound && (
-  <>
-    <View style={styles.segmentHeader}>
-      <Text style={styles.segmentTitle}>Туда</Text>
-    </View>
+          {flight?.outbound && (
+            <>
+              <View style={styles.segmentHeader}>
+                <Text style={styles.segmentTitle}>Туда</Text>
+              </View>
 
-    <View style={styles.timeRow}>
-      <View style={styles.timeCol}>
-        <Text style={styles.timeLabel}>Вылет</Text>
-        <Text style={styles.timeValue}>
-          {formatTime(flight.outbound.departTime)}
-        </Text>
-      </View>
+              <View style={styles.timeRow}>
+                <View style={styles.timeCol}>
+                  <Text style={styles.timeLabel}>Вылет</Text>
+                  <Text style={styles.timeValue}>
+                    {formatTime(flight.outbound.departTime)}
+                  </Text>
+                </View>
 
-      <MaterialIcons name="schedule" size={20} color="#0277bd" />
+                <MaterialIcons name="schedule" size={20} color="#0277bd" />
 
-      <View style={styles.timeCol}>
-        <Text style={styles.timeLabel}>Прилёт</Text>
-        <Text style={styles.timeValue}>
-          {formatTime(flight.outbound.arrivalTime)}
-        </Text>
-      </View>
-    </View>
+                <View style={styles.timeCol}>
+                  <Text style={styles.timeLabel}>Прилёт</Text>
+                  <Text style={styles.timeValue}>
+                    {formatTime(flight.outbound.arrivalTime)}
+                  </Text>
+                </View>
+              </View>
 
-    {calcDuration(
-      flight.outbound.departTime,
-      flight.outbound.arrivalTime
-    ) && (
-      <View style={styles.durationRow}>
-        <MaterialIcons name="timelapse" size={18} color="#666" />
-        <Text style={styles.durationText}>
-          В пути:{" "}
-          {calcDuration(
-            flight.outbound.departTime,
-            flight.outbound.arrivalTime
+              {calcDuration(
+                flight.outbound.departTime,
+                flight.outbound.arrivalTime
+              ) && (
+                <View style={styles.durationRow}>
+                  <MaterialIcons name="timelapse" size={18} color="#666" />
+                  <Text style={styles.durationText}>
+                    В пути:{" "}
+                    {calcDuration(
+                      flight.outbound.departTime,
+                      flight.outbound.arrivalTime
+                    )}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
-        </Text>
-      </View>
-    )}
-  </>
-)}
 
-{flight?.inbound && (
-  <>
-    <View style={[styles.segmentHeader, { marginTop: 14 }]}>
-      <Text style={styles.segmentTitle}>Обратно</Text>
-    </View>
+          {flight?.inbound && (
+            <>
+              <View style={[styles.segmentHeader, { marginTop: 14 }]}>
+                <Text style={styles.segmentTitle}>Обратно</Text>
+              </View>
 
-    <View style={styles.timeRow}>
-      <View style={styles.timeCol}>
-        <Text style={styles.timeLabel}>Вылет</Text>
-        <Text style={styles.timeValue}>
-          {formatTime(flight.inbound.departTime)}
-        </Text>
-      </View>
+              <View style={styles.timeRow}>
+                <View style={styles.timeCol}>
+                  <Text style={styles.timeLabel}>Вылет</Text>
+                  <Text style={styles.timeValue}>
+                    {formatTime(flight.inbound.departTime)}
+                  </Text>
+                </View>
 
-      <MaterialIcons name="schedule" size={20} color="#0277bd" />
+                <MaterialIcons name="schedule" size={20} color="#0277bd" />
 
-      <View style={styles.timeCol}>
-        <Text style={styles.timeLabel}>Прилёт</Text>
-        <Text style={styles.timeValue}>
-          {formatTime(flight.inbound.arrivalTime)}
-        </Text>
-      </View>
-    </View>
+                <View style={styles.timeCol}>
+                  <Text style={styles.timeLabel}>Прилёт</Text>
+                  <Text style={styles.timeValue}>
+                    {formatTime(flight.inbound.arrivalTime)}
+                  </Text>
+                </View>
+              </View>
 
-    {calcDuration(
-      flight.inbound.departTime,
-      flight.inbound.arrivalTime
-    ) && (
-      <View style={styles.durationRow}>
-        <MaterialIcons name="timelapse" size={18} color="#666" />
-        <Text style={styles.durationText}>
-          В пути:{" "}
-          {calcDuration(
-            flight.inbound.departTime,
-            flight.inbound.arrivalTime
+              {calcDuration(
+                flight.inbound.departTime,
+                flight.inbound.arrivalTime
+              ) && (
+                <View style={styles.durationRow}>
+                  <MaterialIcons name="timelapse" size={18} color="#666" />
+                  <Text style={styles.durationText}>
+                    В пути:{" "}
+                    {calcDuration(
+                      flight.inbound.departTime,
+                      flight.inbound.arrivalTime
+                    )}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
-        </Text>
-      </View>
-    )}
-  </>
-)}
 
           <View style={styles.divider} />
 
@@ -307,29 +306,27 @@ const view = flightView ?? {
           </Text>
         </View>
 
-        {/* PASSENGERS */}
         <TouchableOpacity
-  style={styles.card}
-  activeOpacity={0.85}
-  onPress={() => setPassengersVisible(true)}
->
-  <View style={styles.passengersRow}>
-    <View>
-      <Text style={styles.cardTitle}>Пассажиры</Text>
-      <Text style={styles.simpleText}>
-        {passengers?.length || 0} чел.
-      </Text>
-    </View>
+          style={styles.card}
+          activeOpacity={0.85}
+          onPress={() => setPassengersVisible(true)}
+        >
+          <View style={styles.passengersRow}>
+            <View>
+              <Text style={styles.cardTitle}>Пассажиры</Text>
+              <Text style={styles.simpleText}>
+                {passengers?.length || 0} чел.
+              </Text>
+            </View>
 
-    <MaterialIcons
-      name="chevron-right"
-      size={26}
-      color="#0277bd"
-    />
-  </View>
-</TouchableOpacity>
+            <MaterialIcons
+              name="chevron-right"
+              size={26}
+              color="#0277bd"
+            />
+          </View>
+        </TouchableOpacity>
 
-        {/* PRICE */}
         <View style={styles.priceCard}>
           <Text style={styles.priceLabel}>Итого к оплате</Text>
           <Text style={styles.priceValue}>
@@ -337,7 +334,6 @@ const view = flightView ?? {
           </Text>
         </View>
 
-        {/* CONFIRM */}
         <TouchableOpacity
           style={[styles.confirmBtn, loading && styles.confirmBtnDisabled]}
           onPress={book}
@@ -350,78 +346,76 @@ const view = flightView ?? {
           )}
         </TouchableOpacity>
       </ScrollView>
+
       <Modal
-  visible={passengersVisible}
-  transparent
-  animationType="fade"
->
-  <TouchableOpacity
-    style={styles.modalOverlay}
-    activeOpacity={1}
-    onPress={() => setPassengersVisible(false)}
-  >
-    <TouchableOpacity
-      activeOpacity={1}
-      style={styles.modalCard}
-    >
-      <Text style={styles.modalTitle}>Данные пассажиров</Text>
-
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {passengers?.map((p, i) => (
-          <View key={i} style={styles.passengerItem}>
-  <Text style={styles.passengerName}>
-    {formatName(p)}
-  </Text>
-
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>Пол</Text>
-    <Text style={styles.infoValue}>
-      {p.gender === 'M' ? 'Мужской' : 'Женский'}
-    </Text>
-  </View>
-
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>Дата рождения</Text>
-    <Text style={styles.infoValue}>
-      {formatBirthDate(p.birthDate || p.dateOfBirth)}
-    </Text>
-  </View>
-
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>Номер документа</Text>
-    <Text style={styles.infoValue}>
-      {p.passportNumber || p.document}
-    </Text>
-  </View>
-
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>Срок действия</Text>
-    <Text style={styles.infoValue}>
-      {formatExpiryDate(p.passportExpiryDate)}
-    </Text>
-  </View>
-</View>
-        ))}
-      </ScrollView>
-
-      <TouchableOpacity
-        style={styles.modalCloseBtn}
-        onPress={() => setPassengersVisible(false)}
+        visible={passengersVisible}
+        transparent
+        animationType="fade"
       >
-        <Text style={styles.modalCloseText}>Закрыть</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  </TouchableOpacity>
-</Modal>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setPassengersVisible(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.modalCard}
+          >
+            <Text style={styles.modalTitle}>Данные пассажиров</Text>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {passengers?.map((p, i) => (
+                <View key={i} style={styles.passengerItem}>
+                  <Text style={styles.passengerName}>
+                    {formatName(p)}
+                  </Text>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Пол</Text>
+                    <Text style={styles.infoValue}>
+                      {p.gender === 'M' ? 'Мужской' : 'Женский'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Дата рождения</Text>
+                    <Text style={styles.infoValue}>
+                      {formatBirthDate(p.birthDate || p.dateOfBirth)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Номер документа</Text>
+                    <Text style={styles.infoValue}>
+                      {p.passportNumber || p.document}
+                    </Text>
+                  </View>
+
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Срок действия</Text>
+                    <Text style={styles.infoValue}>
+                      {formatExpiryDate(p.passportExpiryDate)}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setPassengersVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>Закрыть</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-/* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
-
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -430,79 +424,65 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
   },
-
   content: {
     padding: 16,
   },
-
   flightCard: {
     backgroundColor: '#f2f8ff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
   },
-
   route: {
     fontSize: 20,
     fontWeight: '800',
     marginBottom: 6,
   },
-
   date: {
     fontSize: 14,
     color: '#555',
   },
-
   timeRow: {
     marginTop: 14,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-
   timeCol: {
     alignItems: 'center',
   },
-
   timeLabel: {
     fontSize: 12,
     color: '#777',
   },
-
   timeValue: {
     fontSize: 16,
     fontWeight: '700',
   },
-
   durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 10,
   },
-
   durationText: {
     marginLeft: 6,
     fontSize: 13,
     color: '#555',
   },
-
   divider: {
     height: 1,
     backgroundColor: '#dbe9f6',
     marginVertical: 14,
   },
-
   cabin: {
     fontSize: 14,
     fontWeight: '600',
     color: '#0277bd',
   },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 18,
@@ -513,141 +493,113 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-
   cardTitle: {
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 6,
   },
-
   simpleText: {
     fontSize: 15,
     fontWeight: '600',
   },
-
   priceCard: {
     backgroundColor: '#f5f8fb',
     borderRadius: 18,
     padding: 18,
     marginBottom: 24,
   },
-
   priceLabel: {
     fontSize: 14,
     color: '#555',
   },
-
   priceValue: {
     fontSize: 28,
     fontWeight: '800',
     color: '#0277bd',
     marginTop: 6,
   },
-
   confirmBtn: {
     backgroundColor: '#0277bd',
     paddingVertical: 18,
     borderRadius: 16,
     alignItems: 'center',
   },
-
   confirmBtnDisabled: { opacity: 0.6 },
-
   confirmText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
-
   passengersRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-},
-
-modalOverlay: {
-  flex: 1,
-  backgroundColor: 'rgba(0,0,0,0.35)',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-
-modalCard: {
-  width: '88%',
-  maxHeight: '80%',
-  backgroundColor: '#fff',
-  borderRadius: 20,
-  padding: 18,
-},
-
-modalTitle: {
-  fontSize: 18,
-  fontWeight: '800',
-  marginBottom: 12,
-},
-
-passengerItem: {
-  backgroundColor: '#f5f8fb',
-  borderRadius: 14,
-  padding: 14,
-  marginBottom: 12,
-},
-
-passengerItem: {
-  backgroundColor: '#f5f8fb',
-  borderRadius: 16,
-  padding: 16,
-  marginBottom: 14,
-},
-
-passengerName: {
-  fontSize: 17,
-  fontWeight: '700',
-  marginBottom: 10,
-  color: '#111',
-},
-
-infoRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  paddingVertical: 6,
-  borderBottomWidth: 1,
-  borderBottomColor: '#e6edf5',
-},
-
-infoLabel: {
-  fontSize: 13,
-  color: '#7a8896',
-},
-
-infoValue: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#111',
-},
-
-modalCloseBtn: {
-  marginTop: 10,
-  paddingVertical: 14,
-  borderRadius: 14,
-  backgroundColor: '#0277bd',
-  alignItems: 'center',
-},
-
-modalCloseText: {
-  color: '#fff',
-  fontSize: 15,
-  fontWeight: '700',
-},
-
-segmentHeader: {
-  marginTop: 12,
-  marginBottom: 6,
-},
-
-segmentTitle: {
-  fontSize: 14,
-  fontWeight: '700',
-  color: '#0277bd',
-},
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: '88%',
+    maxHeight: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 18,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 12,
+  },
+  passengerItem: {
+    backgroundColor: '#f5f8fb',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+  },
+  passengerName: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 10,
+    color: '#111',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e6edf5',
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: '#7a8896',
+  },
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111',
+  },
+  modalCloseBtn: {
+    marginTop: 10,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#0277bd',
+    alignItems: 'center',
+  },
+  modalCloseText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  segmentHeader: {
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  segmentTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0277bd',
+  },
 });

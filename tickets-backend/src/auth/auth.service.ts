@@ -1,5 +1,3 @@
-// src/auth/auth.service.ts
-
 import { Injectable, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -11,6 +9,11 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleOAuthDto } from './dto/oauth.dto';
 import { OAuth2Client } from 'google-auth-library';
 
+/**
+ * Authentication service for user registration, login, and OAuth
+ * Handles JWT token generation and password hashing
+ * TODO: Add refresh token support and token revocation mechanism
+ */
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -20,8 +23,6 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
   ) {
-    // Инициализация Google OAuth клиента
-    // Если GOOGLE_CLIENT_ID не установлен, Google OAuth будет отключен
     const googleClientId = process.env.GOOGLE_CLIENT_ID;
     if (googleClientId) {
       this.googleClient = new OAuth2Client(googleClientId);
@@ -32,20 +33,13 @@ export class AuthService {
   }
 
   /**
-   * Регистрация нового пользователя
-   * 
-   * @param registerDto - Данные для регистрации (email, password, fullName и т.д.)
-   * @returns Объект с JWT токеном и данными пользователя
-   * @throws BadRequestException - если не приняты условия использования
-   * @throws ConflictException - если пользователь с таким email уже существует
+   * Register new user with email and password
    */
   async register(registerDto: RegisterDto) {
-    // Проверка принятия условий использования
     if (!registerDto.termsAccepted) {
       throw new BadRequestException('Terms must be accepted');
     }
 
-    // Проверка существования пользователя с таким email
     const existingUser = await this.userModel.findOne({
       email: registerDto.email.toLowerCase(),
     });
@@ -54,11 +48,8 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Хеширование пароля с помощью bcrypt (10 раундов)
-    // Пароль никогда не хранится в открытом виде
     const passwordHash = await bcrypt.hash(registerDto.password, 10);
 
-    // Создание нового пользователя
     const user = new this.userModel({
       fullName: registerDto.fullName,
       email: registerDto.email.toLowerCase(),
@@ -68,8 +59,8 @@ export class AuthService {
         passportNumber: registerDto.passportNumber,
         country: registerDto.passportCountry,
         expiryDate: registerDto.passportExpiryDate
-        ? new Date(registerDto.passportExpiryDate)
-        : null,
+          ? new Date(registerDto.passportExpiryDate)
+          : null,
       },
       consents: {
         termsAccepted: registerDto.termsAccepted,
@@ -87,11 +78,9 @@ export class AuthService {
 
     await user.save();
 
-    // Generate JWT
     const payload = { sub: user._id.toString(), email: user.email };
     const accessToken = this.jwtService.sign(payload);
 
-    // Remove password hash from response
     const userObj = user.toObject();
     delete userObj.passwordHash;
     delete userObj.avatar;
@@ -102,59 +91,58 @@ export class AuthService {
     };
   }
 
-async login(loginDto: LoginDto) {
-  const { email, phone, password } = loginDto;
-
-  if (!email && !phone) {
-    throw new UnauthorizedException('Email or phone required');
-  }
-
-  const query = email
-    ? { email: email.toLowerCase() }
-    : { phone };
-
-  const user = await this.userModel
-    .findOne(query)
-    .select('+passwordHash');
-
-  if (!user || !user.passwordHash) {
-    throw new UnauthorizedException('Invalid credentials');
-  }
-
-  const isPasswordValid = await bcrypt.compare(
-    password,
-    user.passwordHash,
-  );
-
-  if (!isPasswordValid) {
-    throw new UnauthorizedException('Invalid credentials');
-  }
-
-  if (!user.isActive) {
-    throw new UnauthorizedException('Account is deactivated');
-  }
-
-  const payload = { sub: user._id.toString(), email: user.email };
-  const accessToken = this.jwtService.sign(payload);
-
-  const userObj = user.toObject();
-  delete userObj.passwordHash;
-  delete userObj.avatar;
-
-  return {
-    accessToken,
-    user: userObj,
-  };
-}
   /**
- * Генерация JWT для произвольного пользователя
- * @param user - объект пользователя (достаточно иметь _id и email)
- */
-generateJwt(user: any): string {
-  const payload = { sub: user._id.toString(), email: user.email };
-  return this.jwtService.sign(payload);
-}
+   * Authenticate user with email/phone and password
+   */
+  async login(loginDto: LoginDto) {
+    const { email, phone, password } = loginDto;
 
+    if (!email && !phone) {
+      throw new UnauthorizedException('Email or phone required');
+    }
+
+    const query = email ? { email: email.toLowerCase() } : { phone };
+    const user = await this.userModel.findOne(query).select('+passwordHash');
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is deactivated');
+    }
+
+    const payload = { sub: user._id.toString(), email: user.email };
+    const accessToken = this.jwtService.sign(payload);
+
+    const userObj = user.toObject();
+    delete userObj.passwordHash;
+    delete userObj.avatar;
+
+    return {
+      accessToken,
+      user: userObj,
+    };
+  }
+
+  /**
+   * Generate JWT token for a user
+   */
+  generateJwt(user: any): string {
+    const payload = { sub: user._id.toString(), email: user.email };
+    return this.jwtService.sign(payload);
+  }
+
+  /**
+   * Google OAuth authentication
+   * Creates new user if not exists, or links Google account to existing user
+   */
   async googleAuth(googleDto: GoogleOAuthDto) {
     if (!this.googleClient) {
       throw new BadRequestException('Google OAuth not configured');
@@ -179,19 +167,17 @@ generateJwt(user: any): string {
       });
 
       if (user) {
-        // Update Google ID if not set
         if (!user.googleId) {
           user.googleId = payload.sub;
           user.oauthProvider = 'google';
           await user.save();
         }
       } else {
-        // Create new user
         user = new this.userModel({
           fullName: payload.name || 'User',
           email: payload.email.toLowerCase(),
-          phone: '', // Will be filled later
-          passwordHash: '', // OAuth users don't have password
+          phone: '',
+          passwordHash: '',
           googleId: payload.sub,
           oauthProvider: 'google',
           avatarUrl: payload.picture,
@@ -225,6 +211,9 @@ generateJwt(user: any): string {
     }
   }
 
+  /**
+   * Validate user by ID for JWT strategy
+   */
   async validateUser(userId: string): Promise<UserDocument | null> {
     return this.userModel.findById(userId);
   }

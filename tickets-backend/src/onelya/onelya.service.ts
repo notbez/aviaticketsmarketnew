@@ -35,72 +35,121 @@ import {
   OrderListRequest,
   OrderListResponse,
 } from './dto/order-reservation.dto';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const CyrillicToTranslit = require('cyrillic-to-translit-js');
 
+const CyrillicToTranslit = require('cyrillic-to-translit-js');
 const transliterator = new CyrillicToTranslit();
 
+/**
+ * Date conversion utility - converts DD.MM.YYYY to YYYY-MM-DD format
+ */
 function toIsoDate(date?: string): string | undefined {
   if (!date) return undefined;
-
   if (date.includes('-')) return date;
-
   const parts = date.split('.');
   if (parts.length !== 3) return undefined;
-
   const [d, m, y] = parts;
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Transliterates Cyrillic text to Latin characters for API compatibility
+ */
 function transliterate(value?: string): string | undefined {
   if (!value) return undefined;
+
+  // если уже латиница — не трогаем
+  if (/^[A-Z\s'-]+$/i.test(value)) {
+    return value.toUpperCase();
+  }
+
   return transliterator.transform(value).toUpperCase();
 }
 
+/**
+ * Maps passenger data to Onelya customer format with validation
+ */
+
 function mapPassengerToOnelyaCustomer(p: any, index: number) {
-  if (!p.firstName || !p.lastName || !p.dateOfBirth) {
-    throw new HttpException('Passenger data is incomplete', 400);
+  if (!p.firstName || !p.lastName) {
+    throw new HttpException(
+      `Passenger ${index + 1}: firstName or lastName missing`,
+      400,
+    );
   }
+
+  if (!p.dateOfBirth) {
+    throw new HttpException(
+      `Passenger ${index + 1}: dateOfBirth missing`,
+      400,
+    );
+  }
+
+  const DOCUMENT_TYPE_MAP = {
+    RU_PASSPORT: 'RussianPassport',
+    INTERNATIONAL_PASSPORT: 'RussianForeignPassport',
+    FOREIGN_PASSPORT: 'RussianForeignPassport',
+    BIRTH_CERT: 'BirthCertificate',
+  };
+
+const rawNumber = String(
+  p.passportNumber || p.documentNumber || '',
+).trim();
+
+let documentNumber: string;
+
+if (p.documentType === 'BIRTH_CERT') {
+  // 🔥 Onelya принимает ТОЛЬКО латиницу + цифры
+  documentNumber = rawNumber.replace(/\D/g, '');
+} else {
+  // Паспорта — только цифры
+  documentNumber = rawNumber.replace(/\D/g, '');
+}
+
+if (!documentNumber) {
+  throw new HttpException(
+    `Passenger ${index + 1}: invalid document number`,
+    400,
+  );
+}
+  const validTill =
+    p.documentType !== 'BIRTH_CERT' && p.passportExpiryDate
+      ? `${toIsoDate(p.passportExpiryDate)}T00:00:00`
+      : null;
 
   return {
     $type: 'ApiContracts.Order.V1.Reservation.OrderFullCustomerRequest, ApiContracts',
-
-    DocumentNumber: String(p.passportNumber || '').replace(/\D/g, ''),
-    DocumentType: p.documentType || 'RussianPassport',
-    DocumentValidTill: null,
-
+    DocumentNumber: documentNumber,
+    DocumentType: DOCUMENT_TYPE_MAP[p.documentType] || 'RussianPassport',
+    DocumentValidTill: validTill,
     CitizenshipCode: p.citizenship || 'RU',
     BirthPlace: null,
-
     FirstName: transliterate(p.firstName),
     MiddleName: p.middleName ? transliterate(p.middleName) : null,
     LastName: transliterate(p.lastName),
-
-    Sex:
-      p.gender === 'M'
-        ? 'Male'
-        : p.gender === 'F'
-        ? 'Female'
-        : null,
-
+    Sex: p.gender === 'M' ? 'Male' : p.gender === 'F' ? 'Female' : null,
     Birthday: `${toIsoDate(p.dateOfBirth)}T00:00:00`,
     Index: index + 1,
   };
 }
 
+/**
+ * Validates provider raw data structure
+ */
 function assertValidProviderRaw(providerRaw: any) {
   if (
     !providerRaw ||
     !Array.isArray(providerRaw.Flights) ||
     providerRaw.Flights.length === 0
   ) {
-    throw new HttpException(
-      'ProviderRaw must contain Flights',
-      400,
-    );
+    throw new HttpException('ProviderRaw must contain Flights', 400);
   }
 }
 
+/**
+ * Onelya API service for flight search and booking operations
+ * Handles authentication, request/response processing, and error handling
+ * TODO: Implement request caching and retry logic for better reliability
+ */
 @Injectable()
 export class OnelyaService {
   private readonly logger = new Logger(OnelyaService.name);
@@ -109,7 +158,6 @@ export class OnelyaService {
   private readonly password: string;
   private readonly pos: string;
   private readonly timeoutMs: number;
-  
 
   constructor(
     private readonly httpService: HttpService,
@@ -125,7 +173,7 @@ export class OnelyaService {
       this.configService.get<string>('ONELYA_PASSWORD') || '5mPaN5KyB!27LN!';
     this.pos =
       this.configService.get<string>('ONELYA_POS')?.trim() || 'trevel_test';
-    this.timeoutMs = 180000; // 3 минуты для Onelya API
+    this.timeoutMs = 180000;
 
     if (!this.baseUrl.startsWith('http')) {
       this.logger.warn(
@@ -138,13 +186,14 @@ export class OnelyaService {
     );
   }
 
+  /**
+   * Flight search and pricing endpoints
+   */
   async routePricing(body: RoutePricingRequest): Promise<RoutePricingResponse> {
-    const response = await this.post<RoutePricingRequest, RoutePricingResponse>(
+    return this.post<RoutePricingRequest, RoutePricingResponse>(
       '/Avia/V1/Search/RoutePricing',
       body,
     );
-  
-    return response;
   }
 
   async datePricing(
@@ -174,140 +223,117 @@ export class OnelyaService {
     );
   }
 
-  
+  /**
+   * Reservation management endpoints
+   * TODO: Add validation for flight group consistency across segments
+   */
+  async createReservation(body: any) {
+    const providerRaw = body.route || body.providerRaw;
+    const customers = (body.passengers || []).map((p, i) =>
+      mapPassengerToOnelyaCustomer(p, i),
+    );
 
-async createReservation(body: any) {
-  const providerRaw = body.route || body.providerRaw;
-  const customers = (body.passengers || []).map((p, i) =>
-  mapPassengerToOnelyaCustomer(p, i),
-);
+    assertValidProviderRaw(providerRaw);
 
-  assertValidProviderRaw(providerRaw);
+    if (!Array.isArray(providerRaw.Flights) || providerRaw.Flights.length === 0) {
+      throw new HttpException(
+        'providerRaw.Flights is required for Reservation/Create',
+        400,
+      );
+    }
 
-if (!Array.isArray(providerRaw.Flights) || providerRaw.Flights.length === 0) {
-  throw new HttpException(
-    'providerRaw.Flights is required for Reservation/Create',
-    400,
-  );
-}
+    const flights = providerRaw.Flights.map(f => ({
+      Id: null,
+      MarketingAirlineCode: f.MarketingAirlineCode,
+      OperatingAirlineCode: f.OperatingAirlineCode,
+      FlightNumber: f.FlightNumber,
+      OriginAirportCode: f.OriginAirportCode,
+      DestinationAirportCode: f.DestinationAirportCode,
+      DepartureDateTime: f.DepartureDateTime,
+      ArrivalDateTime: f.ArrivalDateTime,
+      ServiceSubclass: f.ServiceSubclass,
+      FareCode: f.FareCode,
+      ...(f.BrandedFareInfo && {
+        BrandedFareInfo: {
+          BrandName: f.BrandedFareInfo.BrandName,
+          GdsBrandNotation: f.BrandedFareInfo.GdsBrandNotation,
+          GdsBrandId: f.BrandedFareInfo.GdsBrandId,
+        },
+      }),
+      Tariff: f.Tariff ?? undefined,
+      Gds: providerRaw.Gds,
+      FlightGroup: f.FlightGroup,
+    }));
 
-const flights = providerRaw.Flights.map(f => ({
-  Id: null,
+    this.logger.warn(
+      '[DEBUG][FLIGHT GROUPS BEFORE CREATE]',
+      flights.map(f => ({
+        flight: `${f.OriginAirportCode}-${f.DestinationAirportCode}`,
+        routeGroup: f.RouteGroup,
+        flightNumber: f.FlightNumber,
+      })),
+    );
 
-  MarketingAirlineCode: f.MarketingAirlineCode,
-  OperatingAirlineCode: f.OperatingAirlineCode,
-  FlightNumber: f.FlightNumber,
+    const reservationItem = {
+      $type: 'ApiContracts.Avia.V1.Reservation.AviaReservationRequest, ApiContracts',
+      Gds: providerRaw.Gds,
+      PricingGds: providerRaw.Gds,
+      ServiceClass: providerRaw.ServiceClass ?? 'Economic',
+      Flights: flights,
+      PaymentMethod: 'Confirm',
+      ProviderPaymentForm: 'Cash',
+      RelatedBooking: null,
+      DiscountCodes: null,
+      Interface: null,
+      Passengers: body.passengers.map((p, i) => ({
+        Category:
+          p.customerType === 'Infant'
+            ? 'Infant'
+            : p.customerType === 'Child'
+            ? 'Child'
+            : 'Adult',
+        Remarks: null,
+        AdditionalServices: null,
+        OrderCustomerIndex: i + 1,
+      })),
+      Index: 0,
+      AgentReferenceId: null,
+      AgentPaymentId: null,
+      ClientCharge: null,
+    };
 
-  OriginAirportCode: f.OriginAirportCode,
-  DestinationAirportCode: f.DestinationAirportCode,
+    const requestBody: ReservationCreateRequest = {
+      ContactPhone: body.contact?.phone?.startsWith('+')
+        ? body.contact.phone
+        : `+${body.contact?.phone?.replace(/\D/g, '')}`,
+      ContactEmails: body.contact?.email
+        ? [body.contact.email]
+        : ['test@test.ru'],
+      RefuseToReceiveAutomaticRoundTripDiscountForRailwayTickets: false,
+      Customers: customers,
+      ReservationItems: [reservationItem],
+      CheckDoubleBooking: true,
+      PaymentRemark: null,
+      WaitListApplicationId: null,
+      PushNotificationUrl: null,
+    };
 
-  DepartureDateTime: f.DepartureDateTime,
-  ArrivalDateTime: f.ArrivalDateTime,
+    this.logger.warn(
+      '[Onelya] FINAL Reservation/Create body',
+      JSON.stringify(requestBody, null, 2),
+    );
 
-  ServiceSubclass: f.ServiceSubclass,
-  FareCode: f.FareCode,
+    const response = await this.post<
+      ReservationCreateRequest,
+      ReservationCreateResponse
+    >('/Order/V1/Reservation/Create', requestBody);
 
-  ...(f.BrandedFareInfo && {
-  BrandedFareInfo: {
-    BrandName: f.BrandedFareInfo.BrandName,
-    GdsBrandNotation: f.BrandedFareInfo.GdsBrandNotation,
-    GdsBrandId: f.BrandedFareInfo.GdsBrandId,
-  },
-}),
+    this.logger.log(
+      `[Onelya] Reservation created OrderId=${response?.OrderId}`,
+    );
 
-  Tariff: f.Tariff ?? undefined,
-  Gds: providerRaw.Gds,
-  FlightGroup: f.FlightGroup,
-}));
-
-// 🔍 DEBUG: проверяем FlightGroup ПЕРЕД Reservation/Create
-this.logger.warn(
-  '[DEBUG][FLIGHT GROUPS BEFORE CREATE]',
-  flights.map(f => ({
-    flight: `${f.OriginAirportCode}-${f.DestinationAirportCode}`,
-    routeGroup: f.RouteGroup,
-    flightNumber: f.FlightNumber,
-  })),
-);
-
-
-const reservationItem = {
-  $type: 'ApiContracts.Avia.V1.Reservation.AviaReservationRequest, ApiContracts',
-
-  Gds: providerRaw.Gds,
-  PricingGds: providerRaw.Gds,
-  ServiceClass: providerRaw.ServiceClass ?? 'Economic',
-
-  Flights: flights,
-
-  PaymentMethod: 'Confirm',
-  ProviderPaymentForm: 'Cash',
-
-  RelatedBooking: null,
-  DiscountCodes: null,
-  Interface: null,
-
-  Passengers: body.passengers.map((p, i) => ({
-  Category:
-    p.customerType === 'Infant'
-      ? 'Infant'
-      : p.customerType === 'Child'
-      ? 'Child'
-      : 'Adult',
-  Remarks: null,
-  AdditionalServices: null,
-  OrderCustomerIndex: i + 1,
-})),
-
-  Index: 0,
-  AgentReferenceId: null,
-  AgentPaymentId: null,
-  ClientCharge: null,
-};
-
-
-
-const requestBody: ReservationCreateRequest = {
-  ContactPhone: body.contact?.phone?.startsWith('+')
-    ? body.contact.phone
-    : `+${body.contact?.phone?.replace(/\D/g, '')}`,
-
-  ContactEmails: body.contact?.email
-    ? [body.contact.email]
-    : ['test@test.ru'],
-
-  RefuseToReceiveAutomaticRoundTripDiscountForRailwayTickets: false,
-
-  Customers: customers,
-
-  ReservationItems: [reservationItem],
-
-  CheckDoubleBooking: true,
-  PaymentRemark: null,
-  WaitListApplicationId: null,
-  PushNotificationUrl: null,
-};
-
-
-
-  // 🔥 ВОТ СЮДА
-  this.logger.warn(
-    '[Onelya] FINAL Reservation/Create body',
-    JSON.stringify(requestBody, null, 2),
-  );
-
-  const response = await this.post<
-    ReservationCreateRequest,
-    ReservationCreateResponse
-  >('/Order/V1/Reservation/Create', requestBody);
-
-  this.logger.log(
-    `[Onelya] Reservation created OrderId=${response?.OrderId}`,
-  );
-
-  return response;
-}
-  
+    return response;
+  }
 
   async recalcReservation(
     body: ReservationRecalcRequest,
@@ -327,6 +353,9 @@ const requestBody: ReservationCreateRequest = {
     );
   }
 
+  /**
+   * Document generation endpoint - returns PDF buffer
+   */
   async blankReservation(body: ReservationBlankRequest): Promise<{
     buffer: Buffer;
     contentType?: string;
@@ -379,6 +408,9 @@ const requestBody: ReservationCreateRequest = {
     );
   }
 
+  /**
+   * Order information endpoints
+   */
   async orderInfo(body: OrderInfoRequest): Promise<OrderInfoResponse> {
     return this.post<OrderInfoRequest, OrderInfoResponse>(
       '/Order/V1/Info/OrderInfo',
@@ -393,6 +425,9 @@ const requestBody: ReservationCreateRequest = {
     );
   }
 
+  /**
+   * Core HTTP client with authentication and error handling
+   */
   private async post<TRequest, TResponse>(
     endpoint: string,
     body: TRequest,
@@ -472,4 +507,3 @@ const requestBody: ReservationCreateRequest = {
     return `${text.length}b`;
   }
 }
-

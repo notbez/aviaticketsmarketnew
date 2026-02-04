@@ -1,14 +1,17 @@
-// src/auth/guards/jwt-auth.guard.ts
 import {
   Injectable,
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
-  Inject,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 
+/**
+ * JWT authentication guard for protected routes
+ * Validates Bearer tokens and attaches user payload to request
+ * TODO: Add token blacklist support for logout functionality
+ */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly jwtService: JwtService) {}
@@ -25,15 +28,16 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync(token, {
         secret: process.env.JWT_SECRET,
       });
-      // payload содержит sub, email и т.д.
       req['user'] = payload;
       return true;
     } catch (err) {
-      // очистка/логирование можно делать выше по стэку
       throw new UnauthorizedException('Invalid token');
     }
   }
 
+  /**
+   * Extract Bearer token from Authorization header
+   */
   private extractToken(req: Request): string | undefined {
     const auth = req.headers.authorization;
     if (!auth) return undefined;

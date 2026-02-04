@@ -1,4 +1,3 @@
-// screens/ProfileScreen.js
 import React from 'react';
 import {
   View,
@@ -13,10 +12,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 
+/**
+ * User profile screen with account management and navigation menu
+ * Displays user information and provides access to app features
+ * TODO: Add profile picture upload functionality
+ * TODO: Implement user preferences and settings sync
+ */
 export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { logout, user, token } = useAuth();
 
+  /**
+   * Handle user logout with navigation reset
+   */
   const handleLogout = async () => {
     try {
       await logout();
@@ -61,6 +69,9 @@ export default function ProfileScreen({ navigation }) {
     },
   ];
 
+  /**
+   * Render unauthenticated state with login options
+   */
   if (!token || !user) {
     return (
       <SafeAreaView style={styles.safe}>
@@ -96,18 +107,15 @@ export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-        {/* HEADER */}
         <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Text style={styles.headerTitle}>Профиль</Text>
         </View>
 
-        {/* PROFILE CARD */}
         <View style={styles.card}>
           <Image source={{ uri: profile.avatar }} style={styles.avatar} />
           <Text style={styles.name}>{profile.name}</Text>
         </View>
 
-        {/* MENU */}
         <View style={styles.menu}>
           {menu.map((item) => (
             <TouchableOpacity
@@ -125,7 +133,6 @@ export default function ProfileScreen({ navigation }) {
             </TouchableOpacity>
           ))}
 
-          {/* LOGOUT */}
           <TouchableOpacity style={styles.logout} onPress={handleLogout}>
             <MaterialIcons name="exit-to-app" size={20} color="#e53935" />
             <Text style={styles.logoutText}>Выйти из аккаунта</Text>
@@ -135,8 +142,6 @@ export default function ProfileScreen({ navigation }) {
     </SafeAreaView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

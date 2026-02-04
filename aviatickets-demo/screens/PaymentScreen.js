@@ -1,4 +1,3 @@
-// screens/PaymentScreen.js
 import React, { useState, useRef, useEffect } from 'react';
 import {
   SafeAreaView,
@@ -16,6 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../lib/api';
 import { saveFlightView } from '../stores/FlightViewStore';
 
+/**
+ * Payment processing screen with secure payment handling
+ * Processes booking payment and confirms reservation
+ * TODO: Add multiple payment methods support
+ * TODO: Implement payment retry mechanism
+ */
 export default function PaymentScreen() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -31,10 +36,12 @@ export default function PaymentScreen() {
   const finalAmount = Number(amount);
   const [loading, setLoading] = useState(false);
 
-  /* ===== ANIMATION (UI ONLY) ===== */
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateAnim = useRef(new Animated.Value(20)).current;
 
+  /**
+   * Initialize screen animations
+   */
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -50,7 +57,9 @@ export default function PaymentScreen() {
     ]).start();
   }, []);
 
-  /* ===== PAYMENT LOGIC — НЕ ТРОГАЕМ ===== */
+  /**
+   * Process payment and confirm booking
+   */
   const handlePayment = async () => {
     try {
       setLoading(true);
@@ -64,11 +73,10 @@ export default function PaymentScreen() {
         bookingId,
         flightView,
       });
-
     } catch (e) {
       Alert.alert(
         'Ошибка оплаты',
-        e.message || 'Не удалось завершить оплату',
+        e.message || 'Не удалось завершить оплату'
       );
     } finally {
       setLoading(false);
@@ -77,7 +85,6 @@ export default function PaymentScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={24} />
@@ -95,7 +102,6 @@ export default function PaymentScreen() {
           },
         ]}
       >
-        {/* AMOUNT CARD */}
         <View style={styles.amountCard}>
           <Text style={styles.amountLabel}>Итого к оплате</Text>
           <Text style={styles.amountValue}>
@@ -117,7 +123,6 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* PAY BUTTON */}
         <TouchableOpacity
           style={[
             styles.payButton,
@@ -143,8 +148,6 @@ export default function PaymentScreen() {
     </SafeAreaView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: {

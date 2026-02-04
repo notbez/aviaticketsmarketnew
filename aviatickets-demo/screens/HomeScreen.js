@@ -1,4 +1,3 @@
-// screens/HomeScreen.js
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -8,7 +7,6 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useNavigation } from '@react-navigation/native';
@@ -16,11 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { Dimensions } from "react-native";
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../lib/api'; // <- используем твой api wrapper
+import { api } from '../lib/api';
 import CityPickerSheet from '../components/CityPickerSheet';
 import { CITIES } from '../data/cities';
 import DateWheelSheet from '../components/DateWheelSheet';
+import PassengersSheet from '../components/PassengersSheet';
 
+/**
+ * Main flight search screen with form inputs and search functionality
+ * Handles city selection, date picking, passenger counts, and search execution
+ * TODO: Add search history and favorite routes functionality
+ */
 export default function HomeScreen() {
   const nav = useNavigation();
   const insets = useSafeAreaInsets();
@@ -32,20 +36,21 @@ export default function HomeScreen() {
 
   const [departureDate, setDepartureDate] = useState(new Date());
   const [returnDate, setReturnDate] = useState(null);
-  const [pickerMode, setPickerMode] = useState('departure'); // 'departure' | 'return'
+  const [pickerMode, setPickerMode] = useState('departure');
 
-  const [passengers, setPassengers] = useState('1');
-  const [showPassengers, setShowPassengers] = useState(false);
-
+  const [adults, setAdults] = useState(1);
+  const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+  
+  const [passengersSheetVisible, setPassengersSheetVisible] = useState(false);
   const [cls, setCls] = useState('Эконом');
   const [showClass, setShowClass] = useState(false);
   const [isRoundTrip, setIsRoundTrip] = useState(false);
 
-  const [cityTarget, setCityTarget] = useState(null); // 'from' | 'to'
+  const [cityTarget, setCityTarget] = useState(null);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [showDateSheet, setShowDateSheet] = useState(false);
 
-  // тарифы — значения Onelya (ключ) -> русская метка (value)
   const TARIFFS = [
     { value: 'Standard', label: 'Стандартный' },
     { value: 'Subsidized', label: 'Субсидированный' },
@@ -53,35 +58,33 @@ export default function HomeScreen() {
     { value: 'TrilateralAgreement', label: 'Трилатеральное соглашение' },
     { value: 'KaliningradRegion', label: 'Калининградский тариф' },
     { value: 'KaliningradRegionStudent', label: 'Калининградский — студенческий' },
-    // В документации может быть больше типов — если появятся, добавь их сюда.
   ];
 
   const [tariff, setTariff] = useState(TARIFFS[0].value);
   const [showTariff, setShowTariff] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const bottomSheetRef = useRef(null);
   const [bottomSheetContent, setBottomSheetContent] = useState(null);
 
   const { user } = useAuth();
   const username = user?.firstName || 'Гость';
-
   const { width } = Dimensions.get("window");
 
+  /**
+   * Date formatting utilities
+   */
   const formatDateForUI = (d) =>
     `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1)
       .toString()
       .padStart(2, '0')}.${d.getFullYear()}`;
 
-      const formatDateForApi = (date) => {
-  if (!date) return null;
-
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
+  const formatDateForApi = (date) => {
+    if (!date) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   const openBottomSheet = (content) => {
     setBottomSheetContent(content);
@@ -92,6 +95,9 @@ export default function HomeScreen() {
     bottomSheetRef.current?.close?.();
   };
 
+  /**
+   * Execute flight search with form validation and API call
+   */
   const onSearch = async () => {
     if (!fromCode || !toCode) {
       alert('Пожалуйста, выберите города отправления и назначения');
@@ -101,19 +107,17 @@ export default function HomeScreen() {
     setLoading(true);
 
     try {
-      // Формируем тело запроса строго под документацию Onelya.
-      // Backend ожидает поля в своём формате; мы передаём понятные значения,
-      // бэкенд затем должен построить RoutePricingRequest.
       const body = {
         origin: fromCode,
         destination: toCode,
-        // отправляем ISO — backend должен привести в требуемый формат с московским временем
         departureDate: formatDateForApi(departureDate),
         returnDate: isRoundTrip ? formatDateForApi(returnDate) : null,
-        passengers: Number(passengers) || 1,
-        // ServiceClass: 'Economic' или 'Business' (строго как в документации)
+        passengers: {
+          adults,
+          children,
+          infants,
+        },
         serviceClass: cls === 'Эконом' ? 'Economic' : 'Business',
-        // Tariff — строго значение из документации (мы его берем из TARIFFS)
         tariff,
         tripType: isRoundTrip ? 'roundtrip' : 'oneway',
       };
@@ -126,7 +130,6 @@ export default function HomeScreen() {
 
       setLoading(false);
 
-      // ожидаем response.results (массив карточек), response.Routes (сырой ответ Onelya)
       nav.navigate('Results', {
         from: fromCode,
         to: toCode,
@@ -142,10 +145,12 @@ export default function HomeScreen() {
     }
   };
 
+  /**
+   * Reusable form field component
+   */
   const Field = ({ label, icon, value, onPress }) => (
     <View style={{ marginBottom: 18 }}>
       <Text style={styles.fieldLabel}>{label}</Text>
-
       <TouchableOpacity style={styles.fieldBox} onPress={onPress}>
         <MaterialCommunityIcons
           name={icon}
@@ -164,16 +169,14 @@ export default function HomeScreen() {
         <Svg width={width} height={300} style={{ position: 'absolute', top: 0 }}>
           <Defs>
             <LinearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
-  <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
-  <Stop offset="1" stopColor="#1EA6FF" stopOpacity="1" />
-</LinearGradient>
-
+              <Stop offset="0" stopColor="#1EA6FF" stopOpacity="1" />
+              <Stop offset="1" stopColor="#1EA6FF" stopOpacity="1" />
+            </LinearGradient>
             <LinearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
-  <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.18" />
-  <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-</LinearGradient>
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.18" />
+              <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+            </LinearGradient>
           </Defs>
-
           <Path
             d={`
               M0 0
@@ -183,16 +186,14 @@ export default function HomeScreen() {
             `}
             fill="url(#grad)"
           />
-
           <Path
-  d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
-  fill="url(#lightGrad)"
-/>
-
+            d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
+            fill="url(#lightGrad)"
+          />
           <Path
-  d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
-  fill="url(#lightGrad)"
-/>
+            d={`M0 60 Q ${width / 2} 160 ${width} 120 L${width} 0 L0 0 Z`}
+            fill="url(#lightGrad)"
+          />
         </Svg>
       </View>
 
@@ -200,12 +201,10 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 40 }}
         onScrollBeginDrag={() => {
-          setShowPassengers(false);
           setShowClass(false);
           setShowTariff(false);
         }}
       >
-        {/* HEADER */}
         <View
           style={[
             styles.header,
@@ -215,9 +214,7 @@ export default function HomeScreen() {
           <Text style={styles.headerTitle}>Найди свой рейс</Text>
         </View>
 
-        {/* CARD */}
         <View style={styles.card}>
-          {/* TABS */}
           <View style={styles.tabsContainer}>
             <TouchableOpacity
               style={[styles.tab, !isRoundTrip && styles.tabActive]}
@@ -238,19 +235,17 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* FIELDS */}
           <View style={{ position: 'relative', marginBottom: 18 }}>
             <Field
-                label="Откуда"
-                icon="airplane-takeoff"
-                value={fromName}
-                onPress={() => {
-                  setCityTarget('from');
-                  setCityPickerVisible(true);
-                }}
-              />
+              label="Откуда"
+              icon="airplane-takeoff"
+              value={fromName}
+              onPress={() => {
+                setCityTarget('from');
+                setCityPickerVisible(true);
+              }}
+            />
 
-            {/* SWAP BUTTON */}
             <View
               style={{
                 position: 'absolute',
@@ -294,38 +289,35 @@ export default function HomeScreen() {
           </View>
 
           <Field
-  label="Дата вылета"
-  icon="calendar"
-  value={formatDateForUI(departureDate)}
-  onPress={() => {
-    setPickerMode('departure');
-    setShowDateSheet(true);
-  }}
-/>
+            label="Дата вылета"
+            icon="calendar"
+            value={formatDateForUI(departureDate)}
+            onPress={() => {
+              setPickerMode('departure');
+              setShowDateSheet(true);
+            }}
+          />
 
-          {/* Return date (если roundtrip) */}
           {isRoundTrip && (
             <Field
               label="Дата обратного вылета"
               icon="calendar-range"
               value={returnDate ? formatDateForUI(returnDate) : 'Выберите дату'}
               onPress={() => {
-  setPickerMode('return');
-  setShowDateSheet(true);
-}}
+                setPickerMode('return');
+                setShowDateSheet(true);
+              }}
             />
           )}
 
-          {/* PASSENGERS + CLASS + TARIFF */}
           <View style={{ flexDirection: 'row', gap: 14, marginBottom: 18 }}>
             <View style={{ flex: 1, position: 'relative' }}>
               <Text style={styles.fieldLabel}>Пассажиры</Text>
-
               <TouchableOpacity
                 style={styles.fieldBox}
                 onPress={() => {
                   setShowClass(false);
-                  setShowPassengers(!showPassengers);
+                  setPassengersSheetVisible(true);
                 }}
               >
                 <MaterialCommunityIcons
@@ -334,34 +326,17 @@ export default function HomeScreen() {
                   color="#0277bd"
                   style={{ marginRight: 10 }}
                 />
-                <Text style={styles.fieldValue}>{passengers}</Text>
+                <Text style={styles.fieldValue}>
+                  {adults + children + infants}
+                </Text>
               </TouchableOpacity>
-
-              {showPassengers && (
-                <View style={styles.dropdown}>
-                  {[1, 2, 3, 4].map((n) => (
-                    <TouchableOpacity
-                      key={n}
-                      style={styles.dropdownItem}
-                      onPress={() => {
-                        setPassengers(n.toString());
-                        setShowPassengers(false);
-                      }}
-                    >
-                      <Text style={styles.dropdownText}>{n}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
             </View>
 
             <View style={{ flex: 1, position: 'relative' }}>
               <Text style={styles.fieldLabel}>Класс</Text>
-
               <TouchableOpacity
                 style={styles.fieldBox}
                 onPress={() => {
-                  setShowPassengers(false);
                   setShowClass(!showClass);
                 }}
               >
@@ -393,51 +368,59 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* SEARCH BUTTON */}
           <TouchableOpacity style={styles.searchBtn} onPress={onSearch}>
             <Text style={styles.searchTxt}>Поиск рейса</Text>
           </TouchableOpacity>
         </View>
-
       </ScrollView>
-
-      {/* DATE PICKER */}
-      
 
       {loading && <LoadingOverlay />}
 
       <CityPickerSheet
-  visible={cityPickerVisible}
-  cities={CITIES}
-  onClose={() => setCityPickerVisible(false)}
-  onSelect={(city) => {
-    if (cityTarget === 'from') {
-      setFromCode(city.code);
-      setFromName(city.name);
-    } else {
-      setToCode(city.code);
-      setToName(city.name);
-    }
-  }}
-/>
+        visible={cityPickerVisible}
+        cities={CITIES}
+        onClose={() => setCityPickerVisible(false)}
+        onSelect={(city) => {
+          if (cityTarget === 'from') {
+            setFromCode(city.code);
+            setFromName(city.name);
+          } else {
+            setToCode(city.code);
+            setToName(city.name);
+          }
+        }}
+      />
 
-<DateWheelSheet
-  visible={showDateSheet}
-  initialDate={
-    pickerMode === 'departure'
-      ? departureDate
-      : returnDate || departureDate
-  }
-  onClose={() => setShowDateSheet(false)}
-  onConfirm={(date) => {
-    if (pickerMode === 'departure') {
-      setDepartureDate(date);
-      if (returnDate && date > returnDate) setReturnDate(null);
-    } else {
-      setReturnDate(date);
-    }
-  }}
-/>
+      <PassengersSheet
+        visible={passengersSheetVisible}
+        adults={adults}
+        children={children}
+        infants={infants}
+        onClose={() => setPassengersSheetVisible(false)}
+        onChange={({ adults, children, infants }) => {
+          setAdults(adults);
+          setChildren(children);
+          setInfants(infants);
+        }}
+      />
+
+      <DateWheelSheet
+        visible={showDateSheet}
+        initialDate={
+          pickerMode === 'departure'
+            ? departureDate
+            : returnDate || departureDate
+        }
+        onClose={() => setShowDateSheet(false)}
+        onConfirm={(date) => {
+          if (pickerMode === 'departure') {
+            setDepartureDate(date);
+            if (returnDate && date > returnDate) setReturnDate(null);
+          } else {
+            setReturnDate(date);
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -447,12 +430,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
-
   card: {
     backgroundColor: '#fff',
     width: '92%',
@@ -467,14 +448,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-
   tabsContainer: {
     flexDirection: 'row',
     marginBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-
   tab: {
     flex: 1,
     paddingVertical: 12,
@@ -482,29 +461,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-
   tabActive: {
     borderBottomColor: '#0277bd',
   },
-
   tabText: {
     fontSize: 14,
     color: '#999',
     fontWeight: '500',
   },
-
   tabTextActive: {
     color: '#0277bd',
     fontWeight: '700',
   },
-
   fieldLabel: {
     fontSize: 14,
     color: '#666',
     marginBottom: 6,
     marginLeft: 4,
   },
-
   fieldBox: {
     backgroundColor: '#F3F3F3',
     paddingVertical: 14,
@@ -513,13 +487,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-
   fieldValue: {
     fontSize: 16,
     fontWeight: '600',
     color: '#222',
   },
-
   dropdown: {
     position: 'absolute',
     top: 58,
@@ -534,17 +506,14 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 10,
   },
-
   dropdownItem: {
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-
   dropdownText: {
     fontSize: 16,
     color: '#333',
   },
-
   searchBtn: {
     marginTop: 10,
     backgroundColor: '#0277bd',
@@ -552,7 +521,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
   },
-
   searchTxt: {
     color: '#fff',
     fontSize: 18,
@@ -572,7 +540,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
   },
-
   headerTitle: {
     fontSize: 30,
     fontWeight: '800',

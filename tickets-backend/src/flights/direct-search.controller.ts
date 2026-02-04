@@ -10,8 +10,7 @@ export class DirectSearchController {
   @Post('route-pricing')
   async routePricing(@Body() body?: any) {
     this.logger.log('=== MOBILE APP SEARCH REQUEST ===');
-    
-    // Фиксированный запрос к Onelya API
+
     const fixedBody = {
       AdultQuantity: 1,
       ChildQuantity: 0,
@@ -48,7 +47,6 @@ export class DirectSearchController {
       const onelyaResponse = await this.onelyaService.routePricing(fixedBody);
       this.logger.log('Onelya API response received');
       
-      // Трансформируем ответ в билеты для мобильного приложения
       const flights = this.transformToFlights(onelyaResponse);
       this.logger.log(`Transformed to ${flights.length} flights`);
       
@@ -56,7 +54,6 @@ export class DirectSearchController {
     } catch (error) {
       this.logger.error('Request failed:', error);
       
-      // Возвращаем fallback билеты
       const fallbackFlights = this.getFallbackFlights();
       this.logger.log(`Returning ${fallbackFlights.length} fallback flights`);
       

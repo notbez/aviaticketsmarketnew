@@ -9,14 +9,14 @@ import {
   ScrollView,
   Modal,
   Animated,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
-import { KeyboardAvoidingView, Platform } from 'react-native';
-
-/* ================= CONST ================= */
 
 const COUNTRIES = [
   { label: 'Россия', value: 'RU' },
@@ -28,33 +28,46 @@ const GENDERS = [
   { label: 'Женский', value: 'F' },
 ];
 
-/* ================= HELPERS ================= */
+const DOCUMENT_TYPES = {
+  RU_PASSPORT: 'Паспорт РФ',
+  INTERNATIONAL_PASSPORT: 'Загранпаспорт',
+  BIRTH_CERT: 'Свидетельство о рождении',
+};
 
-const normalizeRU = (v = '') =>
-  v.replace(/[^А-Яа-яЁё\- ]/g, '').toUpperCase();
+const RUSSIAN_AIRPORTS = ['SVO', 'DME', 'VKO', 'LED', 'AER', 'KZN', 'SVX'];
 
+/**
+ * Format date to ISO string (YYYY-MM-DD)
+ */
 const formatISO = (d) => d.toISOString().split('T')[0];
 
+/**
+ * Format ISO date to human readable format (DD.MM.YYYY)
+ */
 const formatHuman = (iso) => {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y}`;
 };
 
+/**
+ * Capitalize first letter of string
+ */
 const capitalizeFirst = (v = '') => {
   if (!v) return v;
   return v.charAt(0).toUpperCase() + v.slice(1);
 };
 
+/**
+ * Normalize date value to ISO format
+ */
 const normalizeISODate = (value) => {
   if (!value) return '';
 
-  // Если уже YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return value;
   }
 
-  // ISO строка или Date
   const d = new Date(value);
   if (!isNaN(d)) {
     return d.toISOString().split('T')[0];
@@ -63,17 +76,53 @@ const normalizeISODate = (value) => {
   return '';
 };
 
-/* ================= SCREEN ================= */
+/**
+ * Get available document types based on age and flight type
+ */
+const getDocumentOptions = (birthDate, isDomestic) => {
+  const age = birthDate
+    ? Math.floor(
+        (Date.now() - new Date(birthDate)) / (365.25 * 24 * 3600 * 1000)
+      )
+    : 99;
 
+  if (!isDomestic) {
+    return [
+      { label: DOCUMENT_TYPES.INTERNATIONAL_PASSPORT, value: 'INTERNATIONAL_PASSPORT' },
+    ];
+  }
+
+  if (age < 14) {
+    return [
+      { label: DOCUMENT_TYPES.BIRTH_CERT, value: 'BIRTH_CERT' },
+      { label: DOCUMENT_TYPES.INTERNATIONAL_PASSPORT, value: 'INTERNATIONAL_PASSPORT' },
+    ];
+  }
+
+  return [
+    { label: DOCUMENT_TYPES.RU_PASSPORT, value: 'RU_PASSPORT' },
+    { label: DOCUMENT_TYPES.INTERNATIONAL_PASSPORT, value: 'INTERNATIONAL_PASSPORT' },
+  ];
+};
+
+/**
+ * Passenger information collection screen
+ * Handles multiple passengers with document validation
+ * TODO: Add passport scanning functionality
+ * TODO: Implement passenger data persistence
+ */
 export default function PassengerInfoScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { token, user } = useAuth();
   const { flight, flightView } = route.params || {};
 
+  const isDomestic =
+    RUSSIAN_AIRPORTS.includes(flightView?.from) &&
+    RUSSIAN_AIRPORTS.includes(flightView?.to);
+
   const [expanded, setExpanded] = useState(0);
   const [picker, setPicker] = useState(null);
   const [dropdown, setDropdown] = useState(null);
-
   const [passengers, setPassengers] = useState([
     {
       lastName: '',
@@ -82,63 +131,62 @@ export default function PassengerInfoScreen({ route, navigation }) {
       gender: '',
       citizenship: '',
       birthDate: '',
+      documentType: '',
       document: '',
       passportExpiryDate: '',
     },
   ]);
 
-  console.log('[PassengerInfo] user =', JSON.stringify(user, null, 2));
-
+  /**
+   * Auto-fill first passenger data from user profile
+   */
   useEffect(() => {
-  if (!user) return;
+    if (!user) return;
 
-  const passport =
-    user.passport ||
-    (user.passportNumber
-      ? {
-          passportNumber: user.passportNumber,
-          country: user.passportCountry,
-          expiryDate: user.passportExpiryDate,
-        }
-      : null);
+    const passport =
+      user.passport ||
+      (user.passportNumber
+        ? {
+            passportNumber: user.passportNumber,
+            country: user.passportCountry,
+            expiryDate: user.passportExpiryDate,
+          }
+        : null);
 
-  setPassengers((prev) => {
-    const p0 = prev[0];
-    const next = { ...p0 };
+    setPassengers((prev) => {
+      const p0 = prev[0];
+      const next = { ...p0 };
 
-    // ФИО
-    if (!p0.lastName || !p0.firstName) {
-      const parts = (user.fullName || '')
-        .trim()
-        .split(/\s+/)      // 🔥 КЛЮЧ
-        .filter(Boolean);  // 🔥 КЛЮЧ
-          
-      next.lastName = p0.lastName || parts[0] || '';
-      next.firstName = p0.firstName || parts[1] || '';
-      next.middleName = p0.middleName || parts.slice(2).join(' ') || '';
-    }
+      if (!p0.lastName || !p0.firstName) {
+        const parts = (user.fullName || '')
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean);
 
-    // Гражданство
-    if (!p0.citizenship) {
-      next.citizenship = passport?.country || 'RU';
-    }
+        next.lastName = p0.lastName || parts[0] || '';
+        next.firstName = p0.firstName || parts[1] || '';
+        next.middleName = p0.middleName || parts.slice(2).join(' ') || '';
+      }
 
-    // Номер документа
-    if (!p0.document && passport?.passportNumber) {
-      next.document = passport.passportNumber;
-    }
+      if (!p0.citizenship) {
+        next.citizenship = passport?.country || 'RU';
+      }
 
-    // Срок действия
-    if (!p0.passportExpiryDate && passport?.expiryDate) {
-      next.passportExpiryDate = normalizeISODate(passport.expiryDate);
-    }
+      if (!p0.document && passport?.passportNumber) {
+        next.document = passport.passportNumber;
+      }
 
-    return [next, ...prev.slice(1)];
-  });
-}, [user]);
+      if (!p0.passportExpiryDate && passport?.expiryDate) {
+        next.passportExpiryDate = normalizeISODate(passport.expiryDate);
+      }
 
-  /* ================= UPDATE ================= */
+      return [next, ...prev.slice(1)];
+    });
+  }, [user]);
 
+  /**
+   * Update specific passenger field
+   */
   const updatePassenger = useCallback((i, field, value) => {
     setPassengers((prev) => {
       const next = [...prev];
@@ -147,6 +195,9 @@ export default function PassengerInfoScreen({ route, navigation }) {
     });
   }, []);
 
+  /**
+   * Add new passenger to the list
+   */
   const addPassenger = () => {
     setPassengers((p) => [
       ...p,
@@ -157,6 +208,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
         gender: '',
         citizenship: '',
         birthDate: '',
+        documentType: '',
         document: '',
         passportExpiryDate: '',
       },
@@ -164,59 +216,77 @@ export default function PassengerInfoScreen({ route, navigation }) {
     setExpanded(passengers.length);
   };
 
-  /* ================= CONTINUE ================= */
-
+  /**
+   * Validate passenger data and navigate to booking
+   */
   const handleContinue = () => {
-    const preparedPassengers = passengers.map((p) => {
-      if (
-        !p.lastName ||
-        !p.firstName ||
-        !p.gender ||
-        !p.citizenship ||
-        !p.birthDate ||
-        !p.document ||
-        !p.passportExpiryDate
-      ) {
-        throw new Error('Passenger incomplete');
-      }
+    try {
+      const preparedPassengers = passengers.map((p, index) => {
+        if (!p.documentType) {
+          throw new Error('Выберите тип документа');
+        }
 
-      return {
-        lastName: normalizeRU(p.lastName),
-        firstName: normalizeRU(p.firstName),
-        middleName: normalizeRU(p.middleName || ''),
-        gender: p.gender,
-        citizenship: p.citizenship,
-        dateOfBirth: p.birthDate,
-        passportNumber: p.document,
-        countryOfIssue: p.citizenship,
-        passportExpiryDate: p.passportExpiryDate,
+        if (!p.lastName.trim() || !p.firstName.trim()) {
+          throw new Error(`Пассажир ${index + 1}: укажите имя и фамилию`);
+        }
+
+        if (
+          !p.lastName ||
+          !p.firstName ||
+          !p.gender ||
+          !p.citizenship ||
+          !p.birthDate ||
+          !p.document ||
+          (p.documentType !== 'BIRTH_CERT' && !p.passportExpiryDate)
+        ) {
+          throw new Error(`Пассажир ${index + 1}: заполните все поля`);
+        }
+
+        if (p.documentType === 'INTERNATIONAL_PASSPORT') {
+          if (!/^\d{9}$/.test(p.document)) {
+            throw new Error('Загранпаспорт должен содержать 9 цифр');
+          }
+        }
+
+        if (p.documentType === 'RU_PASSPORT') {
+          if (!/^\d{10}$/.test(p.document)) {
+            throw new Error('Паспорт РФ должен содержать 10 цифр');
+          }
+        }
+
+        return {
+          lastName: p.lastName.trim(),
+          firstName: p.firstName.trim(),
+          middleName: p.middleName?.trim() || null,
+          gender: p.gender,
+          citizenship: p.citizenship,
+          dateOfBirth: p.birthDate,
+          passportNumber: p.document,
+          passportExpiryDate: p.passportExpiryDate,
+          documentType: p.documentType,
+        };
+      });
+
+      const contactInfo = {
+        firstName: preparedPassengers[0].firstName,
+        middleLastName: preparedPassengers[0].lastName,
+        phone: '',
+        email: '',
       };
-    });
 
-    const contactInfo = {
-      firstName: preparedPassengers[0].firstName,
-      middleLastName: preparedPassengers[0].lastName,
-      phone: '',
-      email: '',
-    };
-
-    console.log(
-  '[PassengerInfo] flight.brandId =',
-  flight?.brandId
-);
-
-    navigation.navigate('Booking', {
-      flight: {
-        ...flight, // ⬅️ КРИТИЧНО: не трогаем
-        price: flight.price ?? 0,
-      },
-      flightView, // ⬅️ ПРОСТО ПРОКИДЫВАЕМ
-      passengers: preparedPassengers,
-      contactInfo,
-    });
+      navigation.navigate('Booking', {
+        flight: {
+          ...flight,
+          price: flight.price ?? 0,
+        },
+        flightView,
+        passengers: preparedPassengers,
+        contactInfo,
+      });
+    } catch (e) {
+      Alert.alert('Ошибка', e.message);
+    }
   };
-
-  /* ================= RENDER ================= */
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -247,6 +317,7 @@ export default function PassengerInfoScreen({ route, navigation }) {
             index={i}
             passenger={p}
             expanded={expanded === i}
+            isDomestic={isDomestic}
             onToggle={() => setExpanded(expanded === i ? -1 : i)}
             update={updatePassenger}
             openDropdown={setDropdown}
@@ -277,15 +348,12 @@ export default function PassengerInfoScreen({ route, navigation }) {
           display="default"
           locale="ru-RU"
           onChange={(event, date) => {
-            // ВСЕГДА закрываем пикер
             setPicker(null);
-          
-            // Нажали "Отмена"
+
             if (event.type === 'dismissed') {
               return;
             }
-          
-            // Нажали "OK"
+
             if (event.type === 'set' && date) {
               updatePassenger(
                 picker.index,
@@ -311,9 +379,9 @@ export default function PassengerInfoScreen({ route, navigation }) {
                 mode="date"
                 display="spinner"
                 locale="ru-RU"
-                themeVariant="light"      // 🔥 ВАЖНО
-                textColor="#000"          // 🔥 ВАЖНО
-                style={{ height: 216 }}   // 🔥 ВАЖНО
+                themeVariant="light"
+                textColor="#000"
+                style={{ height: 216 }}
                 onChange={(e, date) => {
                   if (date) {
                     updatePassenger(
@@ -350,10 +418,10 @@ export default function PassengerInfoScreen({ route, navigation }) {
   );
 }
 
-/* ================= CARD ================= */
+
 
 const PassengerCard = React.memo(
-  ({ passenger, expanded, onToggle, index, update, openDropdown, openPicker }) => (
+  ({ passenger, expanded, onToggle, index, update, openDropdown, openPicker, isDomestic }) => (
     <View style={styles.card}>
       <TouchableOpacity style={styles.cardHeader} onPress={onToggle}>
         <Text style={styles.cardTitle}>Пассажир {index + 1}</Text>
@@ -397,22 +465,38 @@ const PassengerCard = React.memo(
             }
           />
 
-          <Select label="Дата рождения"
+                    <Select label="Дата рождения"
             value={formatHuman(passenger.birthDate)}
             onPress={() =>
               openPicker({ index, field: 'birthDate', value: new Date() })
             }
           />
 
-          <Field
-            label="Номер документа"
-            value={passenger.document}
-            keyboardType="numeric"
-            onChange={(t) =>
-              update(index, 'document', t.replace(/\D/g, '').slice(0, 10))
-            }
-          />
+          <Select
+  label="Тип документа"
+  value={DOCUMENT_TYPES[passenger.documentType]}
+  onPress={(y) =>
+    openDropdown({
+      y,
+      index,
+      field: 'documentType',
+      options: getDocumentOptions(passenger.birthDate, isDomestic),
+    })
+  }
+/>
 
+
+          <Field
+  label="Номер документа"
+  value={passenger.document}
+  onChange={(t) =>
+    update(index, 'document', t.replace(/\s/g, '').toUpperCase())
+  }
+  autoCapitalize="characters"
+/>
+
+
+{passenger.documentType !== 'BIRTH_CERT' && (
           <Select
             label="Срок действия документа"
             value={formatHuman(passenger.passportExpiryDate)}
@@ -424,13 +508,14 @@ const PassengerCard = React.memo(
               })
             }
           />
+          )}
         </View>
       )}
     </View>
   )
 );
 
-/* ================= UI ================= */
+
 
 const Field = ({ label, value, onChange, placeholder, onBlur, ...props }) => (
   <>

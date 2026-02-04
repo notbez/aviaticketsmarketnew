@@ -9,14 +9,12 @@ export class User {
   @Prop({ required: true })
   fullName: string;
 
-  // declare unique/index here — единственный источник правды
   @Prop({ required: true, unique: true, lowercase: true, index: true })
   email: string;
 
   @Prop({ required: true })
   phone: string;
 
-  // пароли храним как хэш
   @Prop({ required: true, select: false })
   passwordHash: string;
 
@@ -85,11 +83,8 @@ export class User {
   @Prop({ default: null, index: true })
   googleId?: string;
 
-  @Prop({ default: null, index: true })
-  appleId?: string;
-
   @Prop({ default: null })
-  oauthProvider?: 'google' | 'apple';
+  oauthProvider?: 'google';
 
   @Prop({ default: true })
   isActive: boolean;
@@ -100,7 +95,4 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-// ОСТАВЛЯЕМ только индексы, которые _не_ дублируют email.
-// Убедитесь, что нигде в проекте нет второго UserSchema.index({ email: 1 }).
 UserSchema.index({ googleId: 1 });
-UserSchema.index({ appleId: 1 });

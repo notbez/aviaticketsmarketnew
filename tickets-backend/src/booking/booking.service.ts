@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-
 import {
   Booking,
   BookingDocument,
@@ -28,11 +27,15 @@ export type CreateResult =
       raw?: any;
     };
 
+/**
+ * Booking service for flight reservation management
+ * Handles the complete booking flow: create, payment, confirmation, and document generation
+ * TODO: Implement booking status transitions validation and audit logging
+ */
 @Injectable()
 export class BookingService {
-  private readonly logger = new Logger(
-    BookingService.name,
-  );
+  private readonly logger = new Logger(BookingService.name);
+  private readonly AUTO_CONFIRM_AFTER_CREATE = false;
 
   constructor(
     @InjectModel(Booking.name)
@@ -40,77 +43,93 @@ export class BookingService {
     private readonly onelyaService: OnelyaService,
   ) {}
 
-  // ===========================================================================
-  // NORMALIZATION
-  // ===========================================================================
-
+  /**
+   * Data normalization utilities
+   */
   private normalizePassengers(passengers: any[] = []) {
-    return passengers.map(p => ({
-      ...p,
-      firstName: p.firstName?.trim(),
-      lastName: p.lastName?.trim(),
-      middleName: p.middleName?.trim(),
-    }));
+    return passengers.map((p, i) => {
+      const firstName =
+        typeof p.firstName === 'string' && p.firstName.trim().length > 0
+          ? p.firstName.trim()
+          : typeof p.first_name === 'string' && p.first_name.trim().length > 0
+          ? p.first_name.trim()
+          : undefined;
+    
+      const lastName =
+        typeof p.lastName === 'string' && p.lastName.trim().length > 0
+          ? p.lastName.trim()
+          : typeof p.last_name === 'string' && p.last_name.trim().length > 0
+          ? p.last_name.trim()
+          : undefined;
+    
+      if (!firstName || !lastName) {
+        this.logger.error(
+          `[Passenger normalize] Passenger ${i + 1} name missing`,
+          JSON.stringify(p),
+        );
+      }
+    
+      return {
+        ...p,
+        firstName,
+        lastName,
+        middleName:
+          typeof p.middleName === 'string' && p.middleName.trim().length > 0
+            ? p.middleName.trim()
+            : typeof p.middle_name === 'string' && p.middle_name.trim().length > 0
+            ? p.middle_name.trim()
+            : null,
+        dateOfBirth: p.dateOfBirth || p.birthDate,
+        documentType: p.documentType,
+        passportNumber:
+          p.passportNumber || p.document || p.documentNumber || null,
+        passportExpiryDate: p.passportExpiryDate || null,
+      };
+    });
   }
 
   private generateBlankAccessToken(): string {
-  return crypto.randomBytes(24).toString('hex');
-}
+    return crypto.randomBytes(24).toString('hex');
+  }
 
-private normalizeContact(contact: any) {
-  const phone =
-    contact?.phone?.replace(/\D/g, '') || '79990000000';
+  private normalizeContact(contact: any) {
+    const phone = contact?.phone?.replace(/\D/g, '') || '79990000000';
+    const email = contact?.email?.trim() || 'test@test.ru';
+    return {
+      phone: phone.startsWith('7') ? phone : `7${phone}`,
+      email,
+    };
+  }
 
-  const email =
-    contact?.email?.trim() || 'test@test.ru';
-
-  return {
-    phone: phone.startsWith('7') ? phone : `7${phone}`,
-    email,
-  };
-}
-
-  // ===========================================================================
-  // PUBLIC CREATE
-  // ===========================================================================
-
-  public async create(
-    userId: string,
-    body: any,
-  ): Promise<CreateResult> {
+  /**
+   * Main booking creation entry point
+   */
+  public async create(userId: string, body: any): Promise<CreateResult> {
     return this.createOnelya(userId, body);
   }
 
-  private readonly AUTO_CONFIRM_AFTER_CREATE = false;
-  // ===========================================================================
-  // FULL ONELYA FLOW
-  // ===========================================================================
 
-
-  public async createOnelya(
-    userId: string,
-    body: any,
-  ): Promise<CreateResult> {
+  /**
+   * Complete Onelya booking flow: validation, reservation, recalc, and persistence
+   * TODO: Add transaction support for atomic booking operations
+   */
+  public async createOnelya(userId: string, body: any): Promise<CreateResult> {
     const { offerId, passengers, contact } = body;
 
-    this.logger.log(
-  `[Booking] brandId = ${body.brandId}`,
-);
+    this.logger.log(`[Booking] brandId = ${body.brandId}`);
 
     const passengersCount = {
-  Adult: passengers.filter(
-    p => p.customerType !== 'Child' && p.customerType !== 'Infant',
-  ).length,
-  Infant: passengers.filter(
-    p => p.customerType === 'Infant',
-  ).length,
-};
+      Adult: passengers.filter(
+        p => p.customerType !== 'Child' && p.customerType !== 'Infant',
+      ).length,
+      Infant: passengers.filter(p => p.customerType === 'Infant').length,
+    };
 
-if (passengersCount.Infant > passengersCount.Adult) {
-  throw new BadRequestException(
-    'Infants count cannot exceed adults count',
-  );
-}
+    if (passengersCount.Infant > passengersCount.Adult) {
+      throw new BadRequestException(
+        'Infants count cannot exceed adults count',
+      );
+    }
 
     if (!offerId) {
       throw new BadRequestException('offerId is required');
@@ -118,153 +137,116 @@ if (passengersCount.Infant > passengersCount.Adult) {
 
     const storedOffer = flightOfferStore.get(offerId);
     if (!storedOffer) {
-      throw new BadRequestException(
-        'Offer expired or not found',
-      );
+      throw new BadRequestException('Offer expired or not found');
     }
 
-let providerRoute = storedOffer.providerRaw;
+    let providerRoute = storedOffer.providerRaw;
 
-// ✅ применяем выбранный бренд тарифа
-if (body.brandId) {
-  providerRoute.Flights = providerRoute.Flights.map(f => ({
-    ...f,
-    BrandedFareInfo: {
-      GdsBrandId: body.brandId,
-    },
-  }));
-}
+    // Apply selected brand fare if specified
+    if (body.brandId) {
+      providerRoute.Flights = providerRoute.Flights.map(f => ({
+        ...f,
+        BrandedFareInfo: {
+          GdsBrandId: body.brandId,
+        },
+      }));
+    }
 
-if (!providerRoute) {
-  throw new BadRequestException('Offer corrupted or expired');
-}
+    if (!providerRoute) {
+      throw new BadRequestException('Offer corrupted or expired');
+    }
 
-this.logger.log(
-  `[Booking] Creating reservation from offer=${offerId}, flights=${providerRoute.Flights.length}`,
-);
+    this.logger.log(
+      `[Booking] Creating reservation from offer=${offerId}, flights=${providerRoute.Flights.length}`,
+    );
 
-// 0️⃣ FARE INFO BY ROUTE — ОБЯЗАТЕЛЬНО ПЕРЕД CREATE
-const fareInfo = await this.onelyaService.fareInfoByRoute({
-  Gds: providerRoute.Gds,
-  Flights: providerRoute.Flights.map(f => ({
-    MarketingAirlineCode: f.MarketingAirlineCode,
-    OperatingAirlineCode: f.OperatingAirlineCode,
-    FlightNumber: f.FlightNumber,
-    OriginAirportCode: f.OriginAirportCode,
-    DestinationAirportCode: f.DestinationAirportCode,
-    DepartureDateTime: f.DepartureDateTime,
-    ServiceClass: 'Economic',
-    ServiceSubclass: f.ServiceSubclass,
-    FareCode: f.FareCode,          // ✅ ТОЛЬКО FareCode
-    FlightGroup: f.FlightGroup,
-  })),
-  FlightIndex: 0,
-  AdultQuantity: passengers.filter(p => p.customerType === 'Adult').length,
-  ChildQuantity: passengers.filter(p => p.customerType === 'Child').length,
-  BabyWithoutPlaceQuantity: passengers.filter(p => p.customerType === 'Infant').length,
-  BabyWithPlaceQuantity: 0,
-});
+    this.logger.warn(
+      '[DEBUG PASSENGERS BEFORE ONELYA]',
+      JSON.stringify(this.normalizePassengers(passengers), null, 2),
+    );
 
-// ❗ FareInfoByRoute вызывается ТОЛЬКО для валидации тарифа
-// ❗ НИЧЕГО из ответа НЕ МЕРЖИМ в providerRoute
-if (!fareInfo) {
-  throw new BadRequestException('FareInfoByRoute failed');
-}
+    // Create reservation
+    let reservation;
 
+    try {
+      reservation = await this.onelyaService.createReservation({
+        providerRaw: providerRoute,
+        passengers: this.normalizePassengers(passengers),
+        contact: this.normalizeContact(contact),
+      });
+    } catch (e) {
+      this.logger.error(
+        '[Booking] createReservation crashed BEFORE HTTP',
+        e instanceof Error ? e.stack : e,
+      );
+      throw e; 
+    }
 
-    // 1️⃣ CREATE
-const reservation = await this.onelyaService.createReservation({
-  providerRaw: providerRoute,
-  passengers: this.normalizePassengers(passengers),
-  contact: this.normalizeContact(contact),
-});
+    if (!reservation?.OrderId) {
+      throw new Error('Reservation did not return OrderId');
+    }
 
-if (!reservation?.OrderId) {
-  throw new Error('Reservation did not return OrderId');
-}
+    const orderId = reservation.OrderId;
 
-const orderId = reservation.OrderId;
+    // Recalculate pricing (mandatory step)
+    const recalced = await this.onelyaService.recalcReservation({
+      OrderId: orderId,
+    });
 
-// 2️⃣ RE-CALC (🔥 ОБЯЗАТЕЛЬНО)
-const recalced = await this.onelyaService.recalcReservation({
-  OrderId: orderId,
-});
+    this.logger.log(`[Booking] Recalc completed, OrderId=${orderId}`);
 
-// ⬇️ ВАЖНО: сохранить Recalc
-this.logger.log(
-  `[Booking] Recalc completed, OrderId=${orderId}`,
-);
+    const price =
+      recalced?.AmountAfter ??
+      recalced?.RecalcResults?.[0]?.Amount ??
+      0;
 
-const price =
-  recalced?.AmountAfter ??
-  recalced?.RecalcResults?.[0]?.Amount ??
-  0;
+    const currency = 'RUB';
+    const firstFlight = providerRoute.Flights[0];
+    const from = firstFlight.OriginAirportCode;
+    const to = firstFlight.DestinationAirportCode;
+    const departureDate = new Date(firstFlight.DepartureDateTime);
 
-const currency = 'RUB';
+    this.logger.warn('[RECALC RAW]', JSON.stringify(recalced, null, 2));
 
+    // Persist booking to database
+    const booking = new this.bookingModel({
+      user: new Types.ObjectId(userId),
+      from,
+      to,
+      departureDate,
+      passengers,
+      providerBookingId: String(orderId),
+      bookingStatus: 'created',
+      provider: 'onelya',
+      flightView: body.flightView ?? null,
+      payment: {
+        paymentStatus: 'pending',
+        amount: price,
+        currency,
+      },
+      rawProviderData: {
+        create: reservation,
+        recalc: recalced,
+      },
+    });
 
-  const firstFlight = providerRoute.Flights[0];
+    await booking.save();
+    flightOfferStore.delete(offerId);
 
-const from = firstFlight.OriginAirportCode;
-const to = firstFlight.DestinationAirportCode;
-const departureDate = new Date(firstFlight.DepartureDateTime);
-
-this.logger.warn('[RECALC RAW]', JSON.stringify(recalced, null, 2));
-
-// 3️⃣ SAVE BOOKING
-const booking = new this.bookingModel({
-  user: new Types.ObjectId(userId),
-
-  from,
-  to,
-  departureDate,
-
-  passengers,
-  providerBookingId: String(orderId),
-  bookingStatus: 'created',
-  provider: 'onelya',
-
-  flightView: body.flightView ?? null,
-
-  payment: {
-    paymentStatus: 'pending',
-    amount: price,
-    currency,
-  },
-
-  rawProviderData: {
-    create: reservation,
-    recalc: recalced,
-  },
-});
-
-await booking.save();
-flightOfferStore.delete(offerId);
-
-
-
-return { success: true, booking };
+    return { success: true, booking };
   }
 
-  // ===========================================================================
-  // PAYMENT (VIRTUAL)
-  // ===========================================================================
-
-  public async virtualPay(
-    providerBookingId: string,
-  ) {
-    const orderId =
-      this.parseOrderId(providerBookingId);
-
-    const booking =
-      await this.bookingModel.findOne({
-        providerBookingId: String(orderId),
-      });
+  /**
+   * Payment processing (virtual payment for testing)
+   */
+  public async virtualPay(providerBookingId: string) {
+    const orderId = this.parseOrderId(providerBookingId);
+    const booking = await this.bookingModel.findOne({
+      providerBookingId: String(orderId),
+    });
 
     if (!booking) {
-      throw new BadRequestException(
-        'Booking not found',
-      );
+      throw new BadRequestException('Booking not found');
     }
 
     booking.payment.paymentStatus = 'paid';
@@ -277,144 +259,126 @@ return { success: true, booking };
     return { success: true };
   }
 
-  // ===========================================================================
-  // CONFIRM
-  // ===========================================================================
+  /**
+   * Booking confirmation with provider
+   * Handles both successful confirmations and expected test environment failures
+   */
+  public async confirmOnelya(providerBookingId: string) {
+    const orderId = this.parseOrderId(providerBookingId);
+    const booking = await this.bookingModel.findOne({
+      providerBookingId: String(orderId),
+    });
 
-public async confirmOnelya(
-  providerBookingId: string,
-) {
-  const orderId = this.parseOrderId(providerBookingId);
+    if (!booking) {
+      throw new BadRequestException('Booking not found');
+    }
 
-  const booking = await this.bookingModel.findOne({
-    providerBookingId: String(orderId),
-  });
+    if (booking.payment.paymentStatus !== 'paid') {
+      throw new BadRequestException(
+        'Booking must be paid before confirmation',
+      );
+    }
 
-  if (!booking) {
-    throw new BadRequestException('Booking not found');
-  }
-
-  if (booking.payment.paymentStatus !== 'paid') {
-    throw new BadRequestException(
-      'Booking must be paid before confirmation',
+    this.logger.log(
+      `[Booking] Confirming reservation, OrderId=${orderId}`,
     );
-  }
 
-  this.logger.log(
-    `[Booking] Confirming reservation, OrderId=${orderId}`,
-  );
-
-  try {
-    const result =
-      await this.onelyaService.confirmReservation({
+    try {
+      const result = await this.onelyaService.confirmReservation({
         OrderId: orderId,
       });
+      booking.bookingStatus = 'ticketed';
+      booking.rawProviderData.confirm = result;
+    } catch (e) {
+      // In test environment, confirmation may fail due to insufficient balance
+      booking.bookingStatus = 'created';
+      booking.rawProviderData.confirmError = e;
+    }
 
-    // ✅ PROD: confirm прошёл
-    booking.bookingStatus = 'ticketed';
-    booking.rawProviderData.confirm = result;
-  } catch (e) {
-    // ✅ TEST: нет баланса — это НОРМА
-    booking.bookingStatus = 'created';
-    booking.rawProviderData.confirmError = e;
+    await booking.save();
+    return { success: true };
   }
 
-  await booking.save();
-
-  // ⬅️ ВСЕГДА возвращаем OK, НЕ РОНЯЕМ ФРОНТ
-  return { success: true };
-}
-
-  // ===========================================================================
-  // BLANK
-  // ===========================================================================
-
+  /**
+   * Document generation and retrieval
+   * Generates PDF tickets and manages file storage with access tokens
+   */
   public async getBlankByBookingId(bookingId: string) {
-  if (!Types.ObjectId.isValid(bookingId)) {
-    throw new BadRequestException('Invalid booking id');
+    if (!Types.ObjectId.isValid(bookingId)) {
+      throw new BadRequestException('Invalid booking id');
+    }
+
+    const booking = await this.bookingModel.findById(bookingId);
+    if (!booking) {
+      throw new BadRequestException('Booking not found');
+    }
+
+    const orderId = this.parseOrderId(booking.providerBookingId);
+
+    // Return existing blank if already generated
+    if (booking.rawProviderData?.blank?.fileId) {
+      return {
+        success: true,
+        fileId: booking.rawProviderData.blank.fileId,
+        accessToken: booking.rawProviderData.blank.accessToken,
+      };
+    }
+
+    // Generate new blank document
+    const blank = await this.onelyaService.blankReservation({
+      OrderId: orderId,
+      RetrieveMainServices: true,
+      RetrieveUpsales: true,
+    });
+
+    // Save file to storage
+    const fileId = `blank_${orderId}.pdf`;
+    const fs = require('fs');
+    const path = require('path');
+
+    const dir = path.join(process.cwd(), 'storage/blanks');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+    const filePath = path.join(dir, fileId);
+    fs.writeFileSync(filePath, blank.buffer);
+
+    booking.rawProviderData.blank = {
+      fileId,
+      contentType: blank.contentType || 'application/pdf',
+      receivedAt: new Date(),
+      accessToken: this.generateBlankAccessToken(),
+    };
+
+    booking.markModified('rawProviderData');
+    await booking.save();
+
+    return {
+      success: true,
+      fileId,
+      accessToken: booking.rawProviderData.blank.accessToken,
+    };
   }
 
-  const booking = await this.bookingModel.findById(bookingId);
-
-  if (!booking) {
-    throw new BadRequestException('Booking not found');
-  }
-
-  const orderId = this.parseOrderId(booking.providerBookingId);
-
-  // ✅ Если blank уже есть — просто возвращаем
-  if (booking.rawProviderData?.blank?.fileId) {
-  return {
-    success: true,
-    fileId: booking.rawProviderData.blank.fileId,
-    accessToken: booking.rawProviderData.blank.accessToken,
-  };
-}
-
-  // 🔥 Запрашиваем blank у Onelya
-  const blank = await this.onelyaService.blankReservation({
-    OrderId: orderId,
-    RetrieveMainServices: true,
-    RetrieveUpsales: true,
-  });
-
-  // 🔥 Сохраняем файл
-  const fileId = `blank_${orderId}.pdf`;
-  const fs = require('fs');
-  const path = require('path');
-
-  const dir = path.join(process.cwd(), 'storage/blanks');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-
-  const filePath = path.join(dir, fileId);
-  fs.writeFileSync(filePath, blank.buffer);
-
-  booking.rawProviderData.blank = {
-    fileId,
-    contentType: blank.contentType || 'application/pdf',
-    receivedAt: new Date(),
-    accessToken: this.generateBlankAccessToken(),
-  };
-
-  booking.markModified('rawProviderData');
-
-  await booking.save();
-
-  return {
-    success: true,
-    fileId,
-    accessToken: booking.rawProviderData.blank.accessToken,
-  };
-}
-
-  // ===========================================================================
-  // RE-CALC
-  // ===========================================================================
-
-  public async recalcOnelya(
-    providerBookingId: string,
-  ) {
-    const orderId =
-      this.parseOrderId(providerBookingId);
-
+  /**
+   * Manual recalculation for debugging and price updates
+   */
+  public async recalcOnelya(providerBookingId: string) {
+    const orderId = this.parseOrderId(providerBookingId);
     this.logger.warn(
       `[Booking] Manual recalc invoked, OrderId=${orderId}`,
     );
-
     return this.onelyaService.recalcReservation({
       OrderId: orderId,
     });
   }
 
-  // ===========================================================================
-  // GETTERS
-  // ===========================================================================
-
+  /**
+   * Data retrieval methods
+   */
   public async getById(id: string) {
     if (!Types.ObjectId.isValid(id)) {
       return null;
     }
-
     return this.bookingModel.findById(id).exec();
   }
 
@@ -425,18 +389,13 @@ public async confirmOnelya(
       .exec();
   }
 
-  // ===========================================================================
-  // UTILS
-  // ===========================================================================
-
-  private parseOrderId(
-    providerBookingId?: string,
-  ): number {
+  /**
+   * Utility methods
+   */
+  private parseOrderId(providerBookingId?: string): number {
     const parsed = Number(providerBookingId);
     if (!Number.isFinite(parsed)) {
-      throw new BadRequestException(
-        'Invalid OrderId',
-      );
+      throw new BadRequestException('Invalid OrderId');
     }
     return parsed;
   }

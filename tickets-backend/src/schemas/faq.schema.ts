@@ -30,7 +30,6 @@ export class Faq {
 
 export const FaqSchema = SchemaFactory.createForClass(Faq);
 
-// Indexes
 FaqSchema.index({ category: 1, order: 1 });
 FaqSchema.index({ isActive: 1 });
 

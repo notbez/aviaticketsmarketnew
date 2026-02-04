@@ -1,4 +1,3 @@
-// screens/FaqScreen.js
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
@@ -23,6 +22,11 @@ const categories = [
   { id: 'general', name: 'Общее' },
 ];
 
+/**
+ * FAQ screen with search and category filtering
+ * Displays frequently asked questions with expandable answers
+ * TODO: Add FAQ content management and analytics tracking
+ */
 export default function FaqScreen({ navigation }) {
   const insets = useSafeAreaInsets();
 
@@ -32,11 +36,13 @@ export default function FaqScreen({ navigation }) {
   const [expandedItems, setExpandedItems] = useState(new Set());
   const [loading, setLoading] = useState(true);
 
-  /* ===== LOAD FAQ ONCE ===== */
   useEffect(() => {
     loadFaqs();
   }, []);
 
+  /**
+   * Load FAQ data from API
+   */
   const loadFaqs = async () => {
     try {
       setLoading(true);
@@ -49,7 +55,9 @@ export default function FaqScreen({ navigation }) {
     }
   };
 
-  /* ===== FILTER ===== */
+  /**
+   * Filter FAQs by category and search query
+   */
   const filteredFaqs = useMemo(() => {
     let result = [...faqs];
 
@@ -77,7 +85,6 @@ export default function FaqScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      {/* HEADER */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialCommunityIcons name="arrow-left" size={24} />
@@ -86,7 +93,6 @@ export default function FaqScreen({ navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* SEARCH */}
       <View style={styles.search}>
         <MaterialCommunityIcons name="magnify" size={20} color="#999" />
         <TextInput
@@ -102,7 +108,6 @@ export default function FaqScreen({ navigation }) {
         )}
       </View>
 
-      {/* CATEGORIES (НЕ ЛОМАЕМ ПОЛОЧКУ) */}
       <View style={styles.tabs}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {categories.map((c) => (
@@ -127,7 +132,6 @@ export default function FaqScreen({ navigation }) {
         </ScrollView>
       </View>
 
-      {/* LIST */}
       <ScrollView style={styles.list}>
         {loading ? (
           <View style={styles.center}>
@@ -175,11 +179,8 @@ export default function FaqScreen({ navigation }) {
   );
 }
 
-/* ===== STYLES ===== */
-
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },
-
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -188,14 +189,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-
   headerTitle: {
     flex: 1,
     textAlign: 'center',
     fontSize: 20,
     fontWeight: '800',
   },
-
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,44 +205,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     gap: 8,
   },
-
   searchInput: {
     flex: 1,
     fontSize: 15,
   },
-
   tabs: {
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     paddingHorizontal: 12,
   },
-
   tab: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-
   tabActive: {
     borderBottomColor: '#0277bd',
   },
-
   tabText: {
     color: '#999',
     fontWeight: '500',
   },
-
   tabTextActive: {
     color: '#0277bd',
     fontWeight: '700',
   },
-
   list: {
     paddingHorizontal: 16,
     paddingTop: 12,
   },
-
   card: {
     backgroundColor: '#fff',
     borderRadius: 14,
@@ -253,37 +244,31 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-
   question: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
   },
-
   questionText: {
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
     marginRight: 10,
   },
-
   answer: {
     borderTopWidth: 1,
     borderTopColor: '#eee',
     padding: 16,
   },
-
   answerText: {
     fontSize: 14,
     color: '#555',
     lineHeight: 20,
   },
-
   center: {
     alignItems: 'center',
     paddingVertical: 60,
   },
-
   empty: {
     marginTop: 12,
     color: '#999',

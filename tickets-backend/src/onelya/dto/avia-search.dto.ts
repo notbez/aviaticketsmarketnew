@@ -123,7 +123,6 @@ export interface BrandFarePricingRequest {
   Interface?: string | null;
 }
 
-// 🔥 АКТУАЛЬНЫЙ BrandFarePricing ПО RouteId
 export interface BrandFarePricingByRouteRequest {
   RouteId: string;
 

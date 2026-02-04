@@ -20,8 +20,8 @@ const getApiBase = () => {
   }
 
   // Default fallback - сервер на Timeweb (с учетом префикса /api)
-  // Важно: ждать ответов по адресу http://193.233.103.8:3000/api
-  return 'http://193.233.103.8:3000/api';
+  // Важно: ждать ответов по адресу https://aviaticketsmarket.ru/api
+  return 'https://aviaticketsmarket.ru/api';
 };
 
 export const API_BASE = getApiBase();

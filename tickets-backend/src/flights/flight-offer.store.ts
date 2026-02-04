@@ -4,7 +4,11 @@ export interface FlightOffer {
   providerRoute: any;
   providerRaw: any;
 
-  passengers?: number; // 🔥 ВАЖНО
+  passengers?: {
+  adults: number;
+  children: number;
+  infants: number;
+};
 
   brandFares?: any[] | null;
   __brandFareFlights?: any[];

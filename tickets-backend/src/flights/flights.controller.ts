@@ -1,13 +1,20 @@
-// flights.controller.ts
 import { Controller, Get, Post, Query, Logger, Body, Param } from '@nestjs/common';
 import { FlightsService } from './flights.service';
 
+/**
+ * Flight search and booking controller
+ * Handles flight search requests, fare information, and brand fare retrieval
+ * TODO: Add request validation DTOs and response transformation
+ */
 @Controller('flights')
 export class FlightsController {
   private readonly logger = new Logger(FlightsController.name);
 
   constructor(private readonly flightsService: FlightsService) {}
 
+  /**
+   * Health check endpoint for service monitoring
+   */
   @Get('health')
   health() {
     this.logger.log('Health check requested');
@@ -19,6 +26,9 @@ export class FlightsController {
     };
   }
 
+  /**
+   * Flight search endpoints - supports both GET and POST methods
+   */
   @Get('search')
   async search(@Query() query: any) {
     this.logger.log('GET /flights/search called');
@@ -32,7 +42,9 @@ export class FlightsController {
     return await this.flightsService.search(body);
   }
 
-  // добавьте в imports: Body уже есть
+  /**
+   * Detailed fare information for specific flight segments
+   */
   @Post('fare-info')
   async fareInfo(@Body() body: any) {
     this.logger.log('=== POST /flights/fare-info called ===');
@@ -40,10 +52,12 @@ export class FlightsController {
     return await this.flightsService.getFareInfo(body);
   }
 
+  /**
+   * Brand fare options with pricing and amenities
+   */
   @Post('brand-fares')
   async brandFares(@Body() body: any) {
     this.logger.log('=== POST /flights/brand-fares called ===');
     return await this.flightsService.getBrandFares(body);
   }
 }
-

@@ -29,7 +29,7 @@ export class OnelyaHealthController {
       const response = await firstValueFrom(
         this.http.get(checkUrl, {
           timeout: 10000,
-          validateStatus: () => true, // Принимаем любой статус
+          validateStatus: () => true,
         }),
       );
 

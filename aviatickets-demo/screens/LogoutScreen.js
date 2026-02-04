@@ -2,15 +2,24 @@ import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * Logout screen that handles user session cleanup
+ * Clears all stored data and redirects to login
+ * TODO: Add logout analytics tracking
+ * TODO: Implement selective data clearing options
+ */
 export default function LogoutScreen({ navigation }) {
   useEffect(() => {
-    clearAll();
+    performLogout();
   }, []);
 
-  const clearAll = async () => {
+  /**
+   * Clear user session data and navigate to login
+   */
+  const performLogout = async () => {
     try {
       await AsyncStorage.clear();
-      console.log('✓ AsyncStorage очищен');
+      
       setTimeout(() => {
         navigation.reset({
           index: 0,
@@ -18,7 +27,12 @@ export default function LogoutScreen({ navigation }) {
         });
       }, 1000);
     } catch (error) {
-      console.error('Ошибка очистки:', error);
+      console.error('Logout error:', error);
+      
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     }
   };
 

@@ -1,1 +1,1 @@
-export const API_URL = 'http://193.233.103.8:3000/api';
+export const API_URL = 'https://aviaticketsmarket.ru/api';

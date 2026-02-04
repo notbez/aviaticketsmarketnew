@@ -1,17 +1,3 @@
-/**
- * booking.controller.ts - Контроллер для управления бронированиями
- *
- * Этот контроллер обрабатывает HTTP запросы связанные с бронированиями:
- * - POST /booking/create - создание нового бронирования
- * - GET /booking - получение списка бронирований пользователя
- * - GET /booking/:id - получение конкретного бронирования
- * - POST /booking/:id/blank - генерация blank (JSON)
- * - GET /booking/:id/blank/file - публичная загрузка PDF
- *
- * Все маршруты защищены JWT авторизацией (кроме публичного blank/file)
- *
- * @module BookingController
- */
 import {
   Controller,
   Post,
@@ -22,18 +8,27 @@ import {
   Res,
   Request,
   UseGuards,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { BookingService } from './booking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as path from 'path';
 import * as fs from 'fs';
 
+/**
+ * Booking management controller
+ * Handles flight booking lifecycle: creation, payment, confirmation, and document generation
+ * TODO: Add booking status validation middleware and audit logging
+ */
 @Controller('booking')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
+  /**
+   * Create new flight booking
+   */
   @Post('create')
   @UseGuards(JwtAuthGuard)
   public async create(@Request() req, @Body() body: any) {
@@ -61,6 +56,9 @@ export class BookingController {
     }
   }
 
+  /**
+   * Booking retrieval endpoints
+   */
   @Get()
   @UseGuards(JwtAuthGuard)
   public async getUserBookings(@Request() req) {
@@ -90,12 +88,12 @@ export class BookingController {
     return res.json(booking);
   }
 
+  /**
+   * Booking lifecycle management endpoints
+   */
   @Post(':id/recalc')
   @UseGuards(JwtAuthGuard)
-  public async recalc(
-    @Request() req,
-    @Param('id') id: string,
-  ) {
+  public async recalc(@Request() req, @Param('id') id: string) {
     const booking = await this.bookingService.getById(id);
     if (!booking) return { ok: false, error: 'Booking not found' };
     if (booking.user.toString() !== req.user.sub)
@@ -110,10 +108,7 @@ export class BookingController {
 
   @Post(':id/pay')
   @UseGuards(JwtAuthGuard)
-  public async pay(
-    @Request() req,
-    @Param('id') id: string,
-  ) {
+  public async pay(@Request() req, @Param('id') id: string) {
     const booking = await this.bookingService.getById(id);
     if (!booking) return { ok: false, error: 'Booking not found' };
     if (booking.user.toString() !== req.user.sub)
@@ -128,10 +123,7 @@ export class BookingController {
 
   @Post(':id/confirm')
   @UseGuards(JwtAuthGuard)
-  public async confirm(
-    @Request() req,
-    @Param('id') id: string,
-  ) {
+  public async confirm(@Request() req, @Param('id') id: string) {
     const booking = await this.bookingService.getById(id);
     if (!booking) return { ok: false, error: 'Booking not found' };
     if (booking.user.toString() !== req.user.sub)
@@ -144,16 +136,13 @@ export class BookingController {
     return { ok: true, result };
   }
 
-  // ============================================================
-  // ✅ FIXED: POST /booking/:id/blank
-  // ТЕПЕРЬ: ТОЛЬКО JSON, БЕЗ PDF
-  // ============================================================
+  /**
+   * Document generation and access endpoints
+   * TODO: Implement document expiration and regeneration logic
+   */
   @Post(':id/blank')
   @UseGuards(JwtAuthGuard)
-  async generateBlank(
-    @Request() req,
-    @Param('id') id: string,
-  ) {
+  async generateBlank(@Request() req, @Param('id') id: string) {
     const booking = await this.bookingService.getById(id);
 
     if (!booking) {
@@ -164,14 +153,13 @@ export class BookingController {
       throw new ForbiddenException('Forbidden');
     }
 
-    // ✅ Возвращаем JSON с accessToken
     console.log('🔥 BLANK GENERATE CALLED');
     return this.bookingService.getBlankByBookingId(id);
   }
 
-  // ============================================================
-  // PUBLIC PDF ACCESS
-  // ============================================================
+  /**
+   * Public document download with token-based access control
+   */
   @Get(':id/blank/file')
   async downloadBlankPublic(
     @Param('id') id: string,
@@ -184,11 +172,11 @@ export class BookingController {
       throw new NotFoundException('Booking not found');
     }
 
-let blank = booking.rawProviderData?.blank;
+    let blank = booking.rawProviderData?.blank;
 
-if (!blank) {
-  throw new NotFoundException('Blank not generated');
-}
+    if (!blank) {
+      throw new NotFoundException('Blank not generated');
+    }
 
     if (!token || token !== blank.accessToken) {
       throw new ForbiddenException('Invalid access token');

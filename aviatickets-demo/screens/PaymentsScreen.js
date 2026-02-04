@@ -1,4 +1,3 @@
-// screens/PaymentsScreen.js
 import React, { useState } from 'react';
 import {
   SafeAreaView,
@@ -14,9 +13,16 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+/**
+ * Payment management screen with card storage and payment history
+ * Handles credit card data entry and displays transaction history
+ * TODO: Add card validation with Luhn algorithm
+ * TODO: Implement secure card tokenization
+ * TODO: Add payment method selection (Apple Pay, Google Pay)
+ */
 export default function PaymentsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const [activeSection, setActiveSection] = useState('cards'); // cards, history
+  const [activeSection, setActiveSection] = useState('cards');
   const [cardData, setCardData] = useState({
     cardNumber: '',
     cardHolder: '',
@@ -25,7 +31,6 @@ export default function PaymentsScreen({ navigation }) {
   });
   const [saveCard, setSaveCard] = useState(false);
 
-  // Мок данные для истории платежей
   const paymentHistory = [
     {
       id: '1',
@@ -43,12 +48,18 @@ export default function PaymentsScreen({ navigation }) {
     },
   ];
 
+  /**
+   * Format card number with spaces every 4 digits
+   */
   const formatCardNumber = (text) => {
     const cleaned = text.replace(/\s/g, '');
     const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-    return formatted.slice(0, 19); // Максимум 16 цифр + 3 пробела
+    return formatted.slice(0, 19);
   };
 
+  /**
+   * Format expiry date as MM/YY
+   */
   const formatExpiryDate = (text) => {
     const cleaned = text.replace(/\D/g, '');
     if (cleaned.length >= 2) {
@@ -81,7 +92,6 @@ export default function PaymentsScreen({ navigation }) {
         <Text style={styles.headerTitle}>Платежи</Text>
       </View>
 
-      {/* Tabs */}
       <View style={styles.tabsContainer}>
         <TouchableOpacity
           style={[styles.tab, activeSection === 'cards' && styles.tabActive]}

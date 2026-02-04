@@ -1,4 +1,3 @@
-// screens/AccountScreen.js
 import React, { useState, useEffect, useRef } from 'react';
 import {
   SafeAreaView,
@@ -13,7 +12,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Animated,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,15 +19,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 
-/* ================= CONST ================= */
-
 const COUNTRIES = [
   { label: 'Россия', value: 'RU' },
   { label: 'Узбекистан', value: 'UZ' },
 ];
 
-/* ================= HELPERS ================= */
-
+/**
+ * Date formatting utilities
+ */
 const formatISO = (d) => d.toISOString().split('T')[0];
 
 const formatHuman = (iso) => {
@@ -38,7 +35,9 @@ const formatHuman = (iso) => {
   return `${d}.${m}.${y}`;
 };
 
-// телефон -> +7 (999) 888-23-23
+/**
+ * Phone number formatting for Russian format: +7 (999) 888-23-23
+ */
 const formatPhone = (value) => {
   const digits = value.replace(/\D/g, '');
 
@@ -65,8 +64,11 @@ const onlyDigitsPhone = (value) => {
   return '7' + d;
 };
 
-/* ================= SCREEN ================= */
-
+/**
+ * User profile management screen
+ * Handles personal information, passport data, and contact details
+ * TODO: Add photo upload functionality and form validation
+ */
 export default function AccountScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { token, user, updateUser } = useAuth();
@@ -91,8 +93,6 @@ export default function AccountScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  /* ================= LOAD ================= */
-
   useEffect(() => {
     loadProfile();
   }, []);
@@ -108,6 +108,9 @@ export default function AccountScreen({ navigation }) {
     setIsDirty(changed);
   }, [profile, savedProfile]);
 
+  /**
+   * Load user profile data from API
+   */
   const loadProfile = async () => {
     if (!token) return;
 
@@ -146,8 +149,9 @@ export default function AccountScreen({ navigation }) {
     }
   };
 
-  /* ================= SAVE ================= */
-
+  /**
+   * Update full name when individual name fields change
+   */
   const updateFullName = (p) =>
     [p.lastName, p.firstName, p.middleName].filter(Boolean).join(' ');
 
@@ -158,6 +162,9 @@ export default function AccountScreen({ navigation }) {
       return next;
     });
 
+  /**
+   * Save profile changes to API
+   */
   const onSave = async () => {
     if (!token) return;
 
@@ -192,8 +199,6 @@ export default function AccountScreen({ navigation }) {
       setSaving(false);
     }
   };
-
-  /* ================= RENDER ================= */
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -353,8 +358,9 @@ export default function AccountScreen({ navigation }) {
   );
 }
 
-/* ================= UI ================= */
-
+/**
+ * Reusable form field component
+ */
 const Field = ({ label, children }) => (
   <>
     <Text style={styles.label}>{label}</Text>
@@ -362,6 +368,9 @@ const Field = ({ label, children }) => (
   </>
 );
 
+/**
+ * Dropdown select component
+ */
 const Select = ({ label, value, onPress }) => {
   const ref = useRef(null);
 
@@ -385,8 +394,6 @@ const Select = ({ label, value, onPress }) => {
     </>
   );
 };
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#fff' },

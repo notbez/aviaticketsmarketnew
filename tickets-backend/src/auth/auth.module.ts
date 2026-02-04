@@ -10,7 +10,7 @@ import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
-    forwardRef(() => UsersModule),  // <- Используем forwardRef
+    forwardRef(() => UsersModule),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
